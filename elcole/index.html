@@ -1615,7 +1615,11 @@ async function checkRecordatorios() {
 async function cargarEventos() {
   const panel = document.getElementById('panel-ev');
   if (!panel) return;
-  const hoyStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
+  // Fecha de hoy en formato YYYY-MM-DD usando hora local (evita offset UTC)
+  const ahora = new Date();
+  const hoyStr = ahora.getFullYear() + '-' +
+    String(ahora.getMonth()+1).padStart(2,'0') + '-' +
+    String(ahora.getDate()).padStart(2,'0');
 
   const { data: eventos } = await sb.from('eventos').select('*').eq('curso_id', currentCurso.id).order('fecha_cumple');
   if (!eventos?.length) {
@@ -1668,14 +1672,12 @@ async function cargarEventos() {
   };
 
   const htmlProximos = await Promise.all(proximos.map(ev => renderCard(ev, false)));
-  const htmlPasados = await Promise.all(pasados.map(ev => renderCard(ev, true)));
 
-  let html = htmlProximos.join('');
-  if (htmlPasados.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;">📁 Cumpleaños anteriores</div>`;
-    html += htmlPasados.join('');
+  if (!htmlProximos.length) {
+    panel.innerHTML = '<div class="empty-state"><div class="emoji">🎂</div><p>No hay cumpleaños próximos.<br>Tocá el botón 🎂 para agregar.</p></div>';
+    return;
   }
-  panel.innerHTML = html;
+  panel.innerHTML = htmlProximos.join('');
 }
 
 async function cargarMiembros(panelId = 'panel-mb') {
