@@ -1671,13 +1671,16 @@ async function cargarEventos() {
     </div>`;
   };
 
-  const htmlProximos = await Promise.all(proximos.map(ev => renderCard(ev, false)));
+  // Todos los eventos ordenados por fecha — solo mostrar los que no pasaron
+  const todos = eventos.filter(ev => ev.fecha_cumple >= hoyStr);
 
-  if (!htmlProximos.length) {
+  if (!todos.length) {
     panel.innerHTML = '<div class="empty-state"><div class="emoji">🎂</div><p>No hay cumpleaños próximos.<br>Tocá el botón 🎂 para agregar.</p></div>';
     return;
   }
-  panel.innerHTML = htmlProximos.join('');
+
+  const htmlTodos = await Promise.all(todos.map(ev => renderCard(ev, false)));
+  panel.innerHTML = htmlTodos.join('');
 }
 
 async function cargarMiembros(panelId = 'panel-mb') {
