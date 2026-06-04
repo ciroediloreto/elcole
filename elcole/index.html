@@ -1577,11 +1577,24 @@ async function guardarEdicionMiembro(miembroId) {
 
 async function eliminarMiembro(miembroId, nombre) {
   if (!confirm(`¿Eliminar a ${nombre} del curso? También se eliminarán sus pagos y asistencias.`)) return;
-  await sb.from('pagos').delete().eq('miembro_id', miembroId);
-  await sb.from('retiro_aprobaciones').delete().eq('miembro_id', miembroId);
-  await sb.from('miembros').delete().eq('id', miembroId);
-  toast('Alumno eliminado', '');
-  await cargarMiembros(document.getElementById('panel-familias') ? 'panel-familias' : 'panel-mb');
+  try {
+    // Borrar pagos primero
+    const { error: e1 } = await sb.from('pagos').delete().eq('miembro_id', miembroId);
+    if (e1) console.warn('Error borrando pagos:', e1.message);
+    // Borrar aprobaciones
+    const { error: e2 } = await sb.from('retiro_aprobaciones').delete().eq('miembro_id', miembroId);
+    if (e2) console.warn('Error borrando aprobaciones:', e2.message);
+    // Borrar notificaciones
+    await sb.from('notificaciones').delete().eq('miembro_id', miembroId);
+    // Borrar miembro
+    const { error: e3 } = await sb.from('miembros').delete().eq('id', miembroId);
+    if (e3) { toast('Error al eliminar: ' + e3.message, 'error'); return; }
+    toast('Alumno eliminado ✅', 'success');
+    await cargarMiembros(document.getElementById('panel-familias') ? 'panel-familias' : 'panel-mb');
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+    console.error(e);
+  }
 }
 
 async function mostrarFusionar() {
