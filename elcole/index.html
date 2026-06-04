@@ -945,8 +945,35 @@ async function unirseAlCurso() {
 // ══════════════════════════════════════
 // REGISTRO MIEMBRO (sin cuenta previa, viene de join)
 // ══════════════════════════════════════
-function renderRegistroMiembro() {
+async function renderRegistroMiembro() {
   joinTutorCount = 1;
+
+  // Cargar hijos ya registrados en el curso
+  const { data: hijosExistentes } = await sb.from('miembros')
+    .select('id, nombre_hijo, fecha_cumple_hijo, tutores')
+    .eq('curso_id', joinCursoData.id)
+    .order('nombre_hijo');
+
+  // Agrupar por nombre (para no mostrar duplicados)
+  const hijosUnicos = [];
+  const nombresVistos = new Set();
+  for (const h of (hijosExistentes || [])) {
+    if (!nombresVistos.has(h.nombre_hijo.toLowerCase())) {
+      nombresVistos.add(h.nombre_hijo.toLowerCase());
+      hijosUnicos.push(h);
+    }
+  }
+
+  const opcionesHijos = hijosUnicos.map(h =>
+    `<div class="hijo-opcion" id="hijo-opt-${h.id}" onclick="seleccionarHijoExistente('${h.id}','${h.nombre_hijo.replace(/'/g,"\\'")}','${h.fecha_cumple_hijo||''}')" style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--cream);border:2px solid transparent;border-radius:12px;cursor:pointer;margin-bottom:8px;">
+      <div style="width:40px;height:40px;border-radius:50%;background:var(--pink-light);display:flex;align-items:center;justify-content:center;font-family:'Fredoka One';font-size:16px;color:var(--pink);flex-shrink:0;">${h.nombre_hijo.charAt(0).toUpperCase()}</div>
+      <div>
+        <div style="font-weight:700;font-size:14px;">${h.nombre_hijo}</div>
+        ${h.tutores?.length ? `<div style="font-size:12px;color:var(--text-light);">${h.tutores.join(' · ')}</div>` : ''}
+      </div>
+    </div>`
+  ).join('');
+
   render(`
     <div>
       <div class="screen-hero" style="background:linear-gradient(135deg,var(--blue),var(--purple))">
@@ -955,11 +982,23 @@ function renderRegistroMiembro() {
         <p>${joinCursoData?.curso} · ${joinCursoData?.nombre_colegio}</p>
       </div>
       <div class="screen-content">
+
         <div class="card" style="margin-top:0;">
           <div class="card-title">👤 Tu hijo/a</div>
-          <div class="form-group"><label>Nombre y apellido</label><input type="text" id="jm-hijo" placeholder="Ej: Martina López"></div>
-          <div class="form-group"><label>Fecha de cumpleaños</label><input type="date" id="jm-cumple"></div>
+          ${hijosUnicos.length ? `
+          <p style="font-size:13px;color:var(--text-light);margin-bottom:12px;line-height:1.5;">Seleccioná si tu hijo/a ya fue creado/a, o ingresá sus datos si es nuevo:</p>
+          <div id="hijos-lista">${opcionesHijos}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin:12px 0;">
+            <div style="flex:1;height:1px;background:var(--pink-light);"></div>
+            <span style="font-size:12px;color:var(--text-light);font-weight:600;">o ingresá manualmente</span>
+            <div style="flex:1;height:1px;background:var(--pink-light);"></div>
+          </div>` : ''}
+          <div id="jm-hijo-container">
+            <div class="form-group"><label>Nombre y apellido</label><input type="text" id="jm-hijo" placeholder="Ej: Martina López"></div>
+            <div class="form-group"><label>Fecha de cumpleaños</label><input type="date" id="jm-cumple"></div>
+          </div>
         </div>
+
         <div class="card">
           <div class="card-title">👨‍👩‍👧 Vos (Madre/Padre/Tutor)</div>
           <div id="jm-tutores">
@@ -982,7 +1021,25 @@ function renderRegistroMiembro() {
   `);
 }
 
-let ninoDuplicadoEncontrado = null; // miembro existente con mismo nombre
+let hijoSeleccionadoId = null;
+
+function seleccionarHijoExistente(id, nombre, cumple) {
+  hijoSeleccionadoId = id;
+  // Resaltar seleccionado
+  document.querySelectorAll('.hijo-opcion').forEach(el => {
+    el.style.border = '2px solid transparent';
+    el.style.background = 'var(--cream)';
+  });
+  const opt = document.getElementById('hijo-opt-' + id);
+  if (opt) { opt.style.border = '2px solid var(--pink)'; opt.style.background = '#FFF0F7'; }
+  // Autocompletar campos
+  const inputHijo = document.getElementById('jm-hijo');
+  const inputCumple = document.getElementById('jm-cumple');
+  if (inputHijo) inputHijo.value = nombre;
+  if (inputCumple && cumple) inputCumple.value = cumple;
+}
+
+let ninoDuplicadoEncontrado = null;
 
 async function registrarMiembro() {
   const hijo = document.getElementById('jm-hijo')?.value.trim();
@@ -994,6 +1051,23 @@ async function registrarMiembro() {
 
   const { data: existe } = await sb.from('miembros').select('id').eq('curso_id', joinCursoData.id).eq('email', email).single();
   if (existe) { toast('Ya estás registrado en este curso', 'error'); return; }
+
+  // Si seleccionó un hijo existente → sumarse como tutor sin crear nuevo registro de hijo
+  if (hijoSeleccionadoId) {
+    ninoDuplicadoEncontrado = null;
+    const { data: miembroExistente } = await sb.from('miembros').select('*').eq('id', hijoSeleccionadoId).single();
+    if (miembroExistente) {
+      // Mergear tutores
+      const tutoresActuales = miembroExistente.tutores || [];
+      const tutoresMerged = [...new Set([...tutoresActuales, ...tutores])];
+      await sb.from('miembros').update({ tutores: tutoresMerged }).eq('id', hijoSeleccionadoId);
+
+      // Crear registro propio para este tutor con el mismo hijo
+      await _crearMiembroNuevo({ hijo: miembroExistente.nombre_hijo, cumple: miembroExistente.fecha_cumple_hijo, tutores: tutoresMerged, email, cursoId: joinCursoData.id });
+      hijoSeleccionadoId = null;
+      return;
+    }
+  }
 
   // Detectar si ya existe un niño con el mismo nombre en el curso
   const { data: ninoExistente } = await sb.from('miembros')
@@ -1431,17 +1505,145 @@ async function cargarEventos() {
 async function cargarMiembros(panelId = 'panel-mb') {
   const panel = document.getElementById(panelId);
   if (!panel) return;
+  const esAdmin = currentCurso?.creador_id === currentUser?.id ||
+    (await sb.from('miembros').select('es_admin').eq('curso_id', currentCurso.id).eq('email', currentUser.email).single())?.data?.es_admin;
   const { data: miembros } = await sb.from('miembros').select('*').eq('curso_id', currentCurso.id).order('nombre_hijo');
   if (!miembros?.length) { panel.innerHTML = '<div class="empty-state"><div class="emoji">👥</div><p>Sin miembros.</p></div>'; return; }
-  panel.innerHTML = miembros.map(m => `
-    <div class="miembro-row">
+
+  // Agrupar por nombre_hijo para detectar duplicados
+  const grupos = {};
+  for (const m of miembros) {
+    const key = m.nombre_hijo?.toLowerCase().trim();
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(m);
+  }
+
+  panel.innerHTML = miembros.map(m => {
+    const esDuplicado = grupos[m.nombre_hijo?.toLowerCase().trim()]?.length > 1;
+    return `<div class="miembro-row" style="${esDuplicado ? 'border-left:3px solid #FCD34D;' : ''}">
       <div class="miembro-avatar">${m.nombre_hijo?.charAt(0)?.toUpperCase() || '?'}</div>
       <div style="flex:1;">
-        <div style="font-weight:700;font-size:14px;">👤 ${m.nombre_hijo}</div>
+        <div style="font-weight:700;font-size:14px;">👤 ${m.nombre_hijo} ${esDuplicado ? '<span style="font-size:10px;background:#FEF3C7;color:#92400E;border-radius:999px;padding:2px 8px;font-weight:700;">⚠️ Duplicado</span>' : ''}</div>
         <div style="font-size:12px;color:var(--text-light);">${m.tutores?.join(' · ') || ''}</div>
       </div>
       ${m.es_admin ? '<span class="badge-admin">Admin</span>' : ''}
-    </div>`).join('');
+      ${esAdmin ? `<div style="display:flex;gap:6px;">
+        <button onclick="editarMiembro('${m.id}')" style="background:var(--cream);border:1px solid var(--pink-light);border-radius:8px;padding:5px 8px;font-size:12px;cursor:pointer;">✏️</button>
+        <button onclick="eliminarMiembro('${m.id}','${m.nombre_hijo.replace(/'/g,"\\'")}')" style="background:#FEE2E2;border:1px solid #FECACA;border-radius:8px;padding:5px 8px;font-size:12px;cursor:pointer;">🗑️</button>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+
+  // Mostrar botón de fusionar si hay duplicados
+  const hayDuplicados = Object.values(grupos).some(g => g.length > 1);
+  if (esAdmin && hayDuplicados) {
+    panel.innerHTML += `<div style="margin-top:12px;padding:12px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:12px;">
+      <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:8px;">⚠️ Hay alumnos duplicados</div>
+      <p style="font-size:12px;color:#78350F;margin-bottom:10px;line-height:1.5;">Dos registros tienen el mismo nombre. Podés fusionarlos para unificar los tutores en un solo alumno.</p>
+      <button onclick="mostrarFusionar()" style="background:#F59E0B;color:white;border:none;border-radius:999px;padding:8px 16px;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">🔀 Fusionar duplicados</button>
+    </div>`;
+  }
+}
+
+async function editarMiembro(miembroId) {
+  const { data: m } = await sb.from('miembros').select('*').eq('id', miembroId).single();
+  if (!m) return;
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'modal-editar-miembro';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-handle" onclick="document.getElementById('modal-editar-miembro').remove()"></div>
+      <div class="modal-title">✏️ Editar alumno</div>
+      <div class="form-group"><label>Nombre y apellido del niño/a</label><input type="text" id="em-nombre" value="${m.nombre_hijo || ''}"></div>
+      <div class="form-group"><label>Fecha de cumpleaños</label><input type="date" id="em-cumple" value="${m.fecha_cumple_hijo || ''}"></div>
+      <div class="form-group"><label>Tutores (separados por coma)</label><input type="text" id="em-tutores" value="${(m.tutores || []).join(', ')}"></div>
+      <button class="btn btn-primary" onclick="guardarEdicionMiembro('${miembroId}')">💾 Guardar</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function guardarEdicionMiembro(miembroId) {
+  const nombre = document.getElementById('em-nombre')?.value.trim();
+  const cumple = document.getElementById('em-cumple')?.value;
+  const tutoresRaw = document.getElementById('em-tutores')?.value;
+  const tutores = tutoresRaw.split(',').map(t => t.trim()).filter(Boolean);
+  if (!nombre) { toast('El nombre no puede estar vacío', 'error'); return; }
+  await sb.from('miembros').update({ nombre_hijo: nombre, fecha_cumple_hijo: cumple || null, tutores }).eq('id', miembroId);
+  document.getElementById('modal-editar-miembro')?.remove();
+  toast('Alumno actualizado ✅', 'success');
+  await cargarMiembros(document.getElementById('panel-familias') ? 'panel-familias' : 'panel-mb');
+}
+
+async function eliminarMiembro(miembroId, nombre) {
+  if (!confirm(`¿Eliminar a ${nombre} del curso? También se eliminarán sus pagos y asistencias.`)) return;
+  await sb.from('pagos').delete().eq('miembro_id', miembroId);
+  await sb.from('retiro_aprobaciones').delete().eq('miembro_id', miembroId);
+  await sb.from('miembros').delete().eq('id', miembroId);
+  toast('Alumno eliminado', '');
+  await cargarMiembros(document.getElementById('panel-familias') ? 'panel-familias' : 'panel-mb');
+}
+
+async function mostrarFusionar() {
+  const { data: miembros } = await sb.from('miembros').select('*').eq('curso_id', currentCurso.id).order('nombre_hijo');
+  // Encontrar grupos duplicados
+  const grupos = {};
+  for (const m of miembros) {
+    const key = m.nombre_hijo?.toLowerCase().trim();
+    if (!grupos[key]) grupos[key] = [];
+    grupos[key].push(m);
+  }
+  const duplicados = Object.values(grupos).filter(g => g.length > 1);
+  if (!duplicados.length) { toast('No hay duplicados', ''); return; }
+
+  const listHtml = duplicados.map(grupo => {
+    const nombre = grupo[0].nombre_hijo;
+    const ids = grupo.map(m => m.id).join(',');
+    const tutoresTodos = [...new Set(grupo.flatMap(m => m.tutores || []))];
+    return `<div style="background:var(--cream);border-radius:12px;padding:14px;margin-bottom:10px;">
+      <div style="font-weight:700;margin-bottom:6px;">👤 ${nombre}</div>
+      <div style="font-size:12px;color:var(--text-light);margin-bottom:10px;">Tutores a unificar: ${tutoresTodos.join(', ')}</div>
+      <button onclick="fusionarMiembros('${ids}')" style="background:var(--pink);color:white;border:none;border-radius:999px;padding:7px 16px;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">🔀 Fusionar</button>
+    </div>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'modal-fusionar';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-handle" onclick="document.getElementById('modal-fusionar').remove()"></div>
+      <div class="modal-title">🔀 Fusionar duplicados</div>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:16px;line-height:1.5;">Se va a mantener un solo registro por alumno, unificando todos los tutores.</p>
+      ${listHtml}
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function fusionarMiembros(idsStr) {
+  const ids = idsStr.split(',');
+  const { data: miembros } = await sb.from('miembros').select('*').in('id', ids);
+  if (!miembros?.length) return;
+
+  // Mantener el primero, eliminar el resto
+  const principal = miembros[0];
+  const aEliminar = miembros.slice(1);
+  const tutoresMerged = [...new Set(miembros.flatMap(m => m.tutores || []))];
+  const cumple = miembros.find(m => m.fecha_cumple_hijo)?.fecha_cumple_hijo || null;
+
+  // Reasignar pagos y aprobaciones al miembro principal
+  for (const m of aEliminar) {
+    await sb.from('pagos').update({ miembro_id: principal.id }).eq('miembro_id', m.id);
+    await sb.from('retiro_aprobaciones').update({ miembro_id: principal.id }).eq('miembro_id', m.id);
+    await sb.from('miembros').delete().eq('id', m.id);
+  }
+
+  // Actualizar tutores del principal
+  await sb.from('miembros').update({ tutores: tutoresMerged, fecha_cumple_hijo: cumple }).eq('id', principal.id);
+
+  document.getElementById('modal-fusionar')?.remove();
+  toast(`¡${principal.nombre_hijo} fusionado correctamente! ✅`, 'success');
+  await cargarMiembros(document.getElementById('panel-familias') ? 'panel-familias' : 'panel-mb');
 }
 
 // ══════════════════════════════════════
