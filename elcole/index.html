@@ -2844,6 +2844,12 @@ Requisitos de diseño:
 function cerrarInvitacion() {
   document.getElementById('pantalla-invitacion').style.display = 'none';
   document.body.style.overflow = '';
+  // Volver a renderizar el evento actual
+  if (currentEvento?.id) {
+    abrirEvento(currentEvento.id);
+  } else if (currentCurso?.id) {
+    abrirCurso(currentCurso.id);
+  }
 }
 
 async function compartirInvitacion() {
