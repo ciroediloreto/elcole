@@ -2420,7 +2420,7 @@ Requisitos de diseño:
 - Solo devolver el HTML, sin explicaciones ni markdown`;
 
   try {
-    const response = await fetch('/.netlify/functions/generar-invitacion', {
+    const response = await fetch('/api/generar-invitacion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt })
