@@ -2426,7 +2426,9 @@ Requisitos de diseño:
       body: JSON.stringify({ prompt })
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'Error del servidor');
+    console.log('Response status:', response.status);
+    console.log('Response data:', data);
+    if (!response.ok) throw new Error(data.error || 'Error ' + response.status);
     const html = data.html || '';
     const clean = html.replace(/```html/g, '').replace(/```/g, '').trim();
 
@@ -2436,8 +2438,8 @@ Requisitos de diseño:
     document.body.style.overflow = 'hidden';
 
   } catch(e) {
-    toast('Error al generar la tarjeta', 'error');
-    console.error(e);
+    toast('Error: ' + e.message, 'error');
+    console.error('Error completo:', e);
   } finally {
     btn.textContent = '✨ Generar tarjeta';
     btn.disabled = false;
