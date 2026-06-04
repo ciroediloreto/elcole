@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ElCole</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --pink: #FF6B9D;
+  --pink-light: #FFB3D1;
+  --pink-dark: #E8538A;
+  --cream: #FFF8F0;
+  --green: #6BCB77;
+  --blue: #4D96FF;
+  --purple: #C77DFF;
+  --text: #2D2D2D;
+  --text-light: #888;
+  --white: #FFFFFF;
+  --shadow: 0 4px 20px rgba(255,107,157,0.15);
+  --radius: 20px;
+  --radius-sm: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html, body { width:100%; min-height:100vh; }
+body { font-family:'Nunito',sans-serif; background:var(--cream); color:var(--text); }
+
+#app { width:100%; }
+
+/* LOADER */
+#loader {
+  position:fixed; inset:0; background:var(--cream);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:9999; transition:opacity .4s;
+}
+#loader .logo { font-family:'Fredoka One'; font-size:48px; color:var(--pink); margin-bottom:16px; }
+#loader .spinner { width:36px; height:36px; border:4px solid var(--pink-light); border-top-color:var(--pink); border-radius:50%; animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* TOAST */
+#toast {
+  position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-80px);
+  background:var(--text); color:#fff; padding:12px 24px; border-radius:999px;
+  font-size:14px; font-weight:600; z-index:9998; transition:transform .3s;
+  white-space:nowrap; box-shadow:0 4px 20px rgba(0,0,0,.2);
+}
+#toast.show { transform:translateX(-50%) translateY(0); }
+#toast.success { background:var(--green); }
+#toast.error { background:#FF6B6B; }
+
+/* MODAL */
+.modal-overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.5); z-index:500;
+  align-items:flex-end; justify-content:center;
+}
+.modal-overlay.open { display:flex; }
+.modal {
+  background:var(--white); border-radius:var(--radius) var(--radius) 0 0;
+  padding:24px 24px 40px; width:100%; max-width:480px;
+  max-height:90vh; overflow-y:auto;
+  animation:slideUp .3s ease;
+}
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-handle { width:40px; height:4px; background:#EEE; border-radius:999px; margin:0 auto 20px; cursor:pointer; }
+.modal-title { font-family:'Fredoka One'; font-size:22px; color:var(--text); margin-bottom:16px; }
+
+/* COMUNES */
+.card { background:var(--white); border-radius:var(--radius); padding:24px; box-shadow:var(--shadow); margin-bottom:16px; }
+.card-title { font-family:'Fredoka One'; font-size:20px; margin-bottom:4px; }
+.card-sub { font-size:13px; color:var(--text-light); margin-bottom:16px; }
+.form-group { margin-bottom:16px; }
+.form-group label { display:block; font-size:13px; font-weight:700; color:var(--text-light); margin-bottom:6px; text-transform:uppercase; letter-spacing:.05em; }
+.form-group input, .form-group select {
+  width:100%; padding:14px 16px; border:2px solid #F0E8FF; border-radius:var(--radius-sm);
+  font-family:'Nunito'; font-size:15px; color:var(--text); background:var(--white); outline:none; transition:.2s;
+}
+.form-group input:focus, .form-group select:focus { border-color:var(--pink); box-shadow:0 0 0 4px rgba(255,107,157,.1); }
+.form-group input::placeholder { color:#CCC; }
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:14px 24px; border-radius:999px; border:none;
+  font-family:'Nunito'; font-size:15px; font-weight:800;
+  cursor:pointer; transition:.2s; width:100%;
+}
+.btn-primary { background:var(--pink); color:var(--white); box-shadow:0 4px 16px rgba(255,107,157,.4); }
+.btn-primary:hover { background:var(--pink-dark); }
+.btn-secondary { background:var(--cream); color:var(--pink); border:2px solid var(--pink-light); }
+.btn-secondary:hover { background:var(--pink-light); }
+.btn-ghost { background:transparent; color:var(--text-light); font-size:14px; padding:10px; }
+.btn-sm { padding:8px 16px; font-size:13px; width:auto; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+
+/* HEADER */
+#global-header {
+  position:sticky; top:0; z-index:300;
+}
+#app {
+  padding-top:0;
+}
+.app-header {
+  background:var(--white); padding:16px 20px;
+  display:flex; align-items:center; justify-content:space-between;
+  box-shadow:0 2px 12px rgba(0,0,0,.06);
+}
+.app-header .logo { font-family:'Fredoka One'; font-size:26px; color:var(--pink); }
+.app-header .user-pill {
+  background:var(--cream); border:2px solid var(--pink-light);
+  border-radius:999px; padding:6px 14px;
+  font-size:13px; font-weight:700; color:var(--pink-dark); cursor:pointer;
+}
+.bell-btn {
+  position:relative; background:var(--cream); border:2px solid var(--pink-light);
+  border-radius:999px; width:38px; height:38px; display:flex; align-items:center;
+  justify-content:center; font-size:18px; cursor:pointer; flex-shrink:0;
+  transition:transform .15s;
+}
+.bell-btn:active { transform:scale(.92); }
+.bell-badge {
+  position:absolute; top:-4px; right:-4px;
+  background:var(--pink); color:white; font-family:'Nunito'; font-weight:800;
+  font-size:10px; min-width:18px; height:18px; border-radius:999px;
+  display:flex; align-items:center; justify-content:center; padding:0 4px;
+  border:2px solid var(--white); animation:bell-pop .3s cubic-bezier(.36,.07,.19,.97);
+}
+@keyframes bell-pop { 0%{transform:scale(0)} 70%{transform:scale(1.2)} 100%{transform:scale(1)} }
+.notif-panel {
+  position:fixed; top:64px; right:12px; left:12px; max-width:420px; margin:0 auto;
+  background:var(--white); border-radius:var(--radius); box-shadow:0 8px 32px rgba(0,0,0,.14);
+  z-index:999; max-height:70vh; overflow-y:auto; display:none;
+}
+.notif-panel.open { display:block; animation:slide-down .2s ease; }
+@keyframes slide-down { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+.notif-header { padding:14px 16px; border-bottom:1px solid var(--pink-light); display:flex; align-items:center; justify-content:space-between; }
+.notif-header span { font-family:'Fredoka One'; font-size:17px; color:var(--pink); }
+.notif-item { padding:12px 16px; border-bottom:1px solid #F5F5F5; cursor:pointer; transition:background .15s; }
+.notif-item:hover { background:var(--cream); }
+.notif-item.unread { border-left:3px solid var(--pink); background:#FFF5F9; }
+.notif-item .notif-title { font-weight:700; font-size:14px; margin-bottom:2px; }
+.notif-item .notif-body { font-size:12px; color:var(--text-light); line-height:1.5; }
+.notif-item .notif-time { font-size:11px; color:#CCC; margin-top:3px; }
+
+/* SCREEN HERO */
+.screen-hero {
+  background:linear-gradient(135deg, var(--pink), var(--purple));
+  padding:24px 20px 40px; color:var(--white);
+}
+.screen-hero h2 { font-family:'Fredoka One'; font-size:26px; margin-top:8px; }
+.screen-hero p { font-size:13px; opacity:.85; }
+.screen-content { padding:0 20px; margin-top:-20px; padding-bottom:40px; }
+.btn-back {
+  background:none; border:none; cursor:pointer;
+  display:flex; align-items:center; gap:6px;
+  font-family:'Nunito'; font-size:14px; font-weight:700;
+  color:rgba(255,255,255,.9); padding:0;
+}
+
+/* TUTOR */
+.tutor-row { display:flex; gap:10px; margin-bottom:10px; align-items:flex-start; }
+.tutor-row input { flex:1; }
+.btn-remove {
+  background:#FFE5E5; border:none; border-radius:50%; width:40px; height:40px;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:18px;
+}
+.btn-add-tutor {
+  background:var(--blue); color:var(--white); border:none; border-radius:999px;
+  padding:8px 16px; font-family:'Nunito'; font-size:13px; font-weight:700;
+  cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+}
+
+/* CÓDIGO */
+.codigo-box {
+  background:#F5F0FF; border-radius:var(--radius-sm); padding:20px; text-align:center;
+}
+.codigo-display { font-family:'Fredoka One'; font-size:36px; letter-spacing:8px; color:var(--pink); margin-bottom:8px; }
+.btn-regen {
+  background:none; border:2px solid var(--pink-light); border-radius:999px;
+  padding:6px 16px; font-family:'Nunito'; font-size:13px; font-weight:700; color:var(--pink); cursor:pointer;
+}
+
+/* SHARE */
+.share-card {
+  background:linear-gradient(135deg,#FF6B9D,#C77DFF);
+  border-radius:var(--radius); padding:24px; color:var(--white); text-align:center; margin-bottom:16px;
+}
+.share-card h3 { font-family:'Fredoka One'; font-size:20px; margin-bottom:8px; }
+.share-card .pin-display { font-family:'Fredoka One'; font-size:42px; letter-spacing:8px; background:rgba(255,255,255,.2); border-radius:var(--radius-sm); padding:12px 24px; display:inline-block; margin:12px 0; }
+.btn-copy {
+  background:var(--white); color:var(--pink-dark); border:none; border-radius:999px;
+  padding:12px 24px; font-family:'Nunito'; font-size:14px; font-weight:800; cursor:pointer;
+}
+
+/* CURSO CARD */
+.curso-card {
+  background:var(--white); border-radius:var(--radius); padding:18px 20px; margin-bottom:12px;
+  box-shadow:var(--shadow); cursor:pointer; transition:.2s; border:2px solid transparent;
+  display:flex; align-items:center; gap:16px;
+}
+.curso-card:hover { border-color:var(--pink-light); }
+.curso-logo {
+  width:52px; height:52px; border-radius:50%;
+  background:linear-gradient(135deg,var(--pink-light),var(--purple));
+  display:flex; align-items:center; justify-content:center; font-size:24px; flex-shrink:0; overflow:hidden;
+}
+.curso-logo img { width:100%; height:100%; object-fit:cover; }
+.curso-badge { background:var(--pink-light); color:var(--pink-dark); border-radius:999px; padding:4px 10px; font-size:11px; font-weight:700; }
+
+/* EVENTO */
+.evento-card {
+  background:var(--white); border-radius:var(--radius); padding:18px 20px; margin-bottom:12px;
+  box-shadow:var(--shadow); cursor:pointer; transition:.2s; display:flex; align-items:center; gap:14px;
+}
+.evento-fecha-badge {
+  background:linear-gradient(135deg,var(--pink),var(--purple));
+  color:var(--white); border-radius:var(--radius-sm); padding:8px 12px; text-align:center; flex-shrink:0; min-width:52px;
+}
+.evento-fecha-badge .dia { font-family:'Fredoka One'; font-size:22px; line-height:1; }
+.evento-fecha-badge .mes { font-size:11px; text-transform:uppercase; opacity:.9; }
+.progress-bar { background:#F0E8FF; border-radius:999px; height:8px; overflow:hidden; }
+.progress-fill { background:linear-gradient(90deg,var(--pink),var(--purple)); height:100%; border-radius:999px; transition:.5s; }
+
+/* PAGO */
+.pago-row { display:flex; align-items:center; justify-content:space-between; padding:14px 0; border-bottom:1px solid #F5F0FF; }
+.pago-row:last-child { border-bottom:none; }
+.badge-pagado { background:#DCFCE7; color:#16A34A; border-radius:999px; padding:4px 12px; font-size:12px; font-weight:700; }
+.badge-pendiente { background:#FEF3C7; color:#D97706; border-radius:999px; padding:4px 12px; font-size:12px; font-weight:700; }
+.btn-marcar { background:var(--green); color:var(--white); border:none; border-radius:999px; padding:6px 14px; font-family:'Nunito'; font-size:12px; font-weight:700; cursor:pointer; }
+
+/* TRANSFER */
+.transfer-box { background:linear-gradient(135deg,#F0FFF4,#DCFCE7); border:2px solid #86EFAC; border-radius:var(--radius); padding:20px; margin-bottom:16px; }
+.transfer-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+
+/* MIEMBRO */
+.miembro-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid #F5F0FF; }
+.miembro-avatar { width:40px; height:40px; border-radius:50%; background:linear-gradient(135deg,var(--pink-light),var(--purple)); display:flex; align-items:center; justify-content:center; font-family:'Fredoka One'; font-size:16px; color:var(--white); flex-shrink:0; }
+.badge-admin { background:linear-gradient(135deg,var(--pink),var(--purple)); color:var(--white); border-radius:999px; padding:3px 10px; font-size:11px; font-weight:700; }
+
+/* TABS */
+.tabs { display:flex; background:#F5F0FF; border-radius:999px; padding:4px; margin-bottom:20px; }
+.tab { flex:1; padding:10px; text-align:center; border-radius:999px; font-size:13px; font-weight:700; cursor:pointer; border:none; background:none; font-family:'Nunito'; color:var(--text-light); }
+.tab.active { background:var(--white); color:var(--pink); box-shadow:0 2px 8px rgba(0,0,0,.08); }
+
+/* FAB */
+.fab {
+  position:fixed; bottom:24px; right:24px;
+  width:60px; height:60px; border-radius:50%;
+  background:var(--pink); color:var(--white); border:none; font-size:28px;
+  cursor:pointer; box-shadow:0 6px 20px rgba(255,107,157,.5);
+  display:flex; align-items:center; justify-content:center; z-index:200;
+}
+
+/* LOGO UPLOAD */
+.logo-upload { border:3px dashed var(--pink-light); border-radius:var(--radius); padding:24px; text-align:center; cursor:pointer; background:var(--cream); }
+.logo-upload input { display:none; }
+.logo-preview { width:80px; height:80px; border-radius:50%; object-fit:cover; margin:0 auto 8px; display:block; }
+
+/* EMPTY */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text-light); }
+.empty-state .emoji { font-size:48px; margin-bottom:12px; }
+
+/* PROXIMO CUMPLE */
+.proximo-cumple-card {
+  background:rgba(255,255,255,.2); border-radius:var(--radius-sm);
+  padding:12px 16px; display:flex; align-items:center; gap:12px; margin-top:14px;
+}
+
+/* LOGO UPLOAD */
+.logo-upload:hover { border-color:var(--pink); background:#FFF0F7; }
+
+/* INV FIELDS */
+.time-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="logo">🎒 ElCole</div>
+  <div class="spinner"></div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Modales globales -->
+<div class="modal-overlay" id="modal-perfil">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeModal('modal-perfil')"></div>
+    <div class="modal-title">👤 Mi perfil</div>
+    <div id="perfil-content" style="font-size:14px;line-height:1.8;color:var(--text-light);"></div>
+    <button class="btn btn-secondary" style="margin-top:16px;" onclick="abrirRegistrarCurso()">🏫 Registrar nuevo curso</button>
+    <button class="btn btn-ghost" style="margin-top:8px;color:#EF4444;" onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-nuevo-evento">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeModal('modal-nuevo-evento')"></div>
+    <div class="modal-title">🎂 Nuevo cumpleaños</div>
+    <div class="form-group">
+      <label>¿De quién es el cumple?</label>
+      <select id="ev-nino-select" onchange="autocompletarCumple()" style="width:100%;padding:14px 16px;border:2px solid #F0E8FF;border-radius:var(--radius-sm);font-family:'Nunito';font-size:15px;color:var(--text);background:var(--white);outline:none;">
+        <option value="">Seleccioná un niño/a...</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Fecha del evento <span style="font-weight:400;color:var(--text-light);font-size:12px;">(puede diferir del cumple real)</span></label>
+      <input type="date" id="ev-fecha">
+      <div id="ev-fecha-cumple-hint" style="display:none;margin-top:6px;font-size:12px;color:var(--text-light);">🎂 Cumple real: <span id="ev-fecha-cumple-real"></span></div>
+    </div>
+    <div class="form-group"><label>¿Quién junta para el cumple?</label><input type="text" id="ev-titular" placeholder="Nombre y apellido del titular"></div>
+    <div class="form-group"><label>Alias o CBU</label><input type="text" id="ev-alias" placeholder="alias.banco o CBU"></div>
+    <div class="form-group"><label>Monto sugerido (opcional)</label><input type="number" id="ev-monto" placeholder="Ej: 2000"></div>
+    <div class="form-group">
+      <label>¿Hay fiesta?</label>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button type="button" id="btn-inv-si" onclick="toggleInv(true)" style="flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid #F0E8FF;background:white;font-family:'Nunito';font-size:14px;font-weight:700;cursor:pointer;">🎉 Sí</button>
+        <button type="button" id="btn-inv-no" onclick="toggleInv(false)" style="flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid #F0E8FF;background:white;font-family:'Nunito';font-size:14px;font-weight:700;cursor:pointer;">🎂 Solo regalo</button>
+      </div>
+    </div>
+    <div id="inv-fields" style="display:none;">
+      <div class="form-group"><label>Tipo de lugar</label><select id="ev-tipo-lugar" onchange="toggleSalonNombre('ev')"><option value="">Seleccioná...</option><option value="Casa privada">🏠 Casa privada</option><option value="Salón de fiestas">🎊 Salón de fiestas</option></select></div>
+      <div class="form-group" id="ev-salon-nombre-group" style="display:none;"><label>Nombre del salón</label><input type="text" id="ev-salon-nombre" placeholder="Ej: Salón El Jardín"></div>
+      <div class="form-group"><label>Domicilio</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="ev-domicilio" placeholder="Calle y número" style="flex:1;" oninput="actualizarMapsLink('ev')">
+          <a id="ev-maps-link" href="#" target="_blank" style="display:none;flex-shrink:0;background:var(--blue);color:white;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;">📍 Maps</a>
+        </div>
+      </div>
+      <div class="form-group"><label>Ciudad</label><input type="text" id="ev-ciudad" oninput="actualizarMapsLink('ev')"></div>
+      <div class="time-grid"><div class="form-group"><label>Desde</label><input type="time" id="ev-desde"></div><div class="form-group"><label>Hasta</label><input type="time" id="ev-hasta"></div></div>
+    </div>
+    <button class="btn btn-primary" onclick="crearEvento()">Crear cumpleaños 🎉</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-editar-evento">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeModal('modal-editar-evento')"></div>
+    <div class="modal-title">✏️ Editar cumpleaños</div>
+    <div class="form-group"><label>Nombre</label><input type="text" id="edit-ev-nombre"></div>
+    <div class="form-group"><label>Fecha</label><input type="date" id="edit-ev-fecha"></div>
+    <div class="form-group"><label>¿Quién junta para el cumple?</label><input type="text" id="edit-ev-titular"></div>
+    <div class="form-group"><label>Alias o CBU</label><input type="text" id="edit-ev-alias"></div>
+    <div class="form-group"><label>Monto sugerido</label><input type="number" id="edit-ev-monto"></div>
+    <div class="form-group">
+      <label>¿Hay fiesta?</label>
+      <div style="display:flex;gap:10px;margin-top:4px;">
+        <button type="button" id="edit-btn-inv-si" onclick="toggleEditInv(true)" style="flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid #F0E8FF;background:white;font-family:'Nunito';font-size:14px;font-weight:700;cursor:pointer;">🎉 Sí</button>
+        <button type="button" id="edit-btn-inv-no" onclick="toggleEditInv(false)" style="flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid #F0E8FF;background:white;font-family:'Nunito';font-size:14px;font-weight:700;cursor:pointer;">🎂 Solo regalo</button>
+      </div>
+    </div>
+    <div id="edit-inv-fields">
+      <div class="form-group"><label>Tipo de lugar</label><select id="edit-ev-tipo-lugar" onchange="toggleSalonNombre('edit-ev')"><option value="">Seleccioná...</option><option value="Casa privada">🏠 Casa privada</option><option value="Salón de fiestas">🎊 Salón de fiestas</option></select></div>
+      <div class="form-group" id="edit-ev-salon-nombre-group" style="display:none;"><label>Nombre del salón</label><input type="text" id="edit-ev-salon-nombre" placeholder="Ej: Salón El Jardín"></div>
+      <div class="form-group"><label>Domicilio</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" id="edit-ev-domicilio" style="flex:1;" oninput="actualizarMapsLink('edit-ev')">
+          <a id="edit-ev-maps-link" href="#" target="_blank" style="display:none;flex-shrink:0;background:var(--blue);color:white;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;">📍 Maps</a>
+        </div>
+      </div>
+      <div class="form-group"><label>Ciudad</label><input type="text" id="edit-ev-ciudad" oninput="actualizarMapsLink('edit-ev')"></div>
+      <div class="time-grid"><div class="form-group"><label>Desde</label><input type="time" id="edit-ev-desde"></div><div class="form-group"><label>Hasta</label><input type="time" id="edit-ev-hasta"></div></div>
+    </div>
+    <button class="btn btn-primary" onclick="guardarEdicionEvento()">💾 Guardar cambios</button>
+    <button class="btn btn-ghost" style="margin-top:8px;color:#EF4444;" onclick="confirmarEliminarEvento()">🗑️ Eliminar cumpleaños</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-editar-curso">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeModal('modal-editar-curso')"></div>
+    <div class="modal-title">✏️ Editar curso</div>
+    <div class="form-group"><label>Nombre del colegio</label><input type="text" id="edit-curso-colegio"></div>
+    <div class="form-group"><label>Curso / Grado</label><input type="text" id="edit-curso-nombre"></div>
+    <div class="form-group"><label>Cantidad de alumnos</label><input type="number" id="edit-curso-alumnos" min="1" max="50"></div>
+    <button class="btn btn-primary" onclick="guardarEdicionCurso()">💾 Guardar cambios</button>
+    <button class="btn btn-ghost" style="margin-top:8px;color:#EF4444;" onclick="confirmarEliminarCurso()">🗑️ Eliminar curso</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-nino-duplicado">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeModal('modal-nino-duplicado')"></div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:48px;margin-bottom:8px;">👨‍👩‍👧</div>
+      <div class="modal-title" style="margin-bottom:4px;">¡Este niño/a ya está en el curso!</div>
+      <p style="font-size:14px;color:var(--text-light);line-height:1.6;">Encontramos un alumno/a con el mismo nombre. Podés sumarte como otro tutor de ese niño, o corregir el nombre si lo escribiste diferente.</p>
+    </div>
+    <div id="duplicado-info" style="background:var(--cream);border-radius:var(--radius-sm);padding:16px;margin-bottom:20px;"></div>
+    <button class="btn btn-primary" onclick="confirmarUnirseNinoExistente()">👨‍👩‍👧 Soy tutor/a de este niño</button>
+    <button class="btn btn-secondary" style="margin-top:10px;" onclick="closeModal('modal-nino-duplicado')">✏️ Corregir el nombre</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-nuevo-retiro">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeModal('modal-nuevo-retiro')"></div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:40px;margin-bottom:6px;">🚗</div>
+      <div class="modal-title">Nuevo retiro</div>
+      <p style="font-size:13px;color:var(--text-light);line-height:1.6;margin-top:4px;">
+        Esta sección protege la seguridad de los niños y el colegio. Registrá quién retirará a uno o más alumnos, adjuntá una foto del adulto responsable y seleccioná los niños a retirar. Los padres de cada niño deberán aprobar el retiro antes de que sea válido.
+      </p>
+    </div>
+    <div class="form-group">
+      <label>Fecha del retiro</label>
+      <input type="date" id="ret-fecha">
+    </div>
+    <div class="form-group">
+      <label>Nombre del adulto que retira</label>
+      <input type="text" id="ret-adulto" placeholder="Ej: Carlos Rodríguez">
+    </div>
+    <div class="form-group">
+      <div id="ret-foto-section"></div>
+    </div>
+    <div class="form-group">
+      <label>¿A qué niños/as retira?</label>
+      <div id="ret-ninos-check" style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;"></div>
+    </div>
+    <button class="btn btn-primary" onclick="crearRetiro()">🚗 Crear retiro</button>
+  </div>
+</div>
+
+<!-- GLOBAL HEADER - always visible -->
+<div class="app-header" id="global-header" style="display:none;">
+  <div class="logo">🎒 ElCole</div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="bell-btn" onclick="toggleNotifPanel()" id="bell-btn">
+      🔔
+      <div class="bell-badge" id="bell-badge" style="display:none;">0</div>
+    </div>
+    <div class="user-pill" id="header-user-pill" onclick="mostrarPerfil()">— ☰</div>
+  </div>
+</div>
+
+<!-- NOTIFICATION PANEL -->
+<div id="notif-panel" class="notif-panel">
+  <div class="notif-header">
+    <span>🔔 Notificaciones</span>
+    <button onclick="marcarTodasLeidas()" style="background:none;border:none;font-family:Nunito;font-size:12px;color:var(--pink);font-weight:700;cursor:pointer;">Marcar todas leídas</button>
+  </div>
+  <div id="notif-list"><p style="padding:20px;text-align:center;color:var(--text-light);font-size:13px;">Cargando...</p></div>
+</div>
+
+<div class="modal-overlay" id="modal-generar-invitacion">
+  <div class="modal">
+    <div class="modal-handle" onclick="closeModal('modal-generar-invitacion')"></div>
+    <div style="text-align:center;margin-bottom:16px;">
+      <div style="font-size:40px;margin-bottom:6px;">🎨</div>
+      <div class="modal-title">Crear invitación digital</div>
+    </div>
+    <div class="form-group">
+      <label>¿Cómo aparece el nombre en la tarjeta?</label>
+      <input type="text" id="inv-nombre-display" placeholder="Ej: Sofi, Benjamín, Facu...">
+    </div>
+    <div class="form-group">
+      <label>Temática</label>
+      <input type="text" id="inv-tematica" placeholder="Ej: Spiderman, princesas, Labubu, dinosaurios, Lego...">
+    </div>
+    <button class="btn btn-primary" id="btn-generar-inv" onclick="generarInvitacion()">✨ Generar tarjeta</button>
+  </div>
+</div>
+
+<!-- FULLSCREEN INVITACION -->
+<div id="pantalla-invitacion" style="display:none;position:fixed;inset:0;z-index:500;background:#000;overflow-y:auto;">
+  <div style="position:sticky;top:0;z-index:10;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:rgba(0,0,0,.8);">
+    <button onclick="cerrarInvitacion()" style="background:rgba(255,255,255,.15);border:none;border-radius:999px;padding:8px 16px;color:white;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">← Volver</button>
+    <button onclick="compartirInvitacion()" style="background:var(--pink);border:none;border-radius:999px;padding:8px 16px;color:white;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">📤 Compartir</button>
+  </div>
+  <div id="inv-contenido" style="padding:16px;"></div>
+</div>
+
+<!-- APP CONTAINER -->
+<div id="app"></div>
+
+<script>
+const SUPA_URL = 'https://lstzesxlnxjbcrpdgdyz.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxzdHplc3hsbnhqYmNycGRnZHl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MDk2MDEsImV4cCI6MjA5NTk4NTYwMX0.REnf7lYuoqgkfTryz-ClmYIlzOjla5ZUolVVIjhNAtk';
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let currentUser = null;
+let currentCurso = null;
+let currentEvento = null;
+let joinCursoData = null;
+let tutorCount = 1;
+let joinTutorCount = 1;
+let tieneInv = false;
+let editTieneInv = false;
+let logoBase64 = null;
+let currentTab = 'ev';
+let retiroFotoBase64 = null;
+
+// ══ RENDER — reemplaza el contenido del app ══
+function render(html) {
+  document.getElementById('app').innerHTML = html;
+  window.scrollTo(0, 0);
+  document.body.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
+}
+
+// ══ TOAST ══
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => t.className = '', 3000);
+}
+
+// ══ MODAL ══
+function showModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'modal-nuevo-retiro' && selfieStream) {
+    selfieStream.getTracks().forEach(t => t.stop());
+    selfieStream = null;
+  }
+}
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open');
+});
+
+// ══ LOADER ══
+function hideLoader() {
+  const l = document.getElementById('loader');
+  l.style.opacity = '0';
+  setTimeout(() => l.style.display = 'none', 400);
+}
+
+// ══ INIT ══
+window.onload = async () => {
+  try {
+    renderWelcome();
+
+    const params = new URLSearchParams(window.location.search);
+    const linkCode = params.get('curso');
+    if (window.history?.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    const saved = localStorage.getItem('elcole_user');
+    if (saved) {
+      try { currentUser = JSON.parse(saved); } catch(e) { currentUser = null; }
+    }
+
+    hideLoader();
+
+    if (linkCode) {
+      await procesarLink(linkCode);
+      return;
+    }
+
+    if (currentUser) {
+      try {
+        const { data } = await sb.from('miembros').select('id').eq('id', currentUser.id).single();
+        if (data) { await renderDashboard(); return; }
+      } catch(e) {}
+      localStorage.removeItem('elcole_user');
+      currentUser = null;
+    }
+
+    renderWelcome();
+  } catch(e) {
+    console.error('Init error:', e);
+    hideLoader();
+    renderWelcome();
+  }
+};
+
+// ══════════════════════════════════════
+// PANTALLA BIENVENIDA
+// ══════════════════════════════════════
+function renderWelcome() {
+  setGlobalHeader(false);
+  render(`
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 24px;text-align:center;">
+      <div style="font-size:80px;margin-bottom:16px;animation:bounce 2s ease infinite;">🎒</div>
+      <h1 style="font-family:'Fredoka One';font-size:48px;color:var(--pink);margin-bottom:8px;">ElCole</h1>
+      <p style="font-size:16px;color:var(--text-light);margin-bottom:40px;line-height:1.5;">La app del curso.<br>Cumpleaños, colectas y más,<br>todo organizado.</p>
+      <div style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;">
+        <button class="btn btn-primary" onclick="renderRegistroEmail()">🎒 Registrarme</button>
+        <button class="btn btn-secondary" onclick="renderJoin(null)">🔗 Unirme a un curso</button>
+        <button class="btn btn-ghost" onclick="renderLoginExistente()">Ya tengo cuenta →</button>
+      </div>
+    </div>
+    <style>@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}</style>
+  `);
+}
+
+// ══════════════════════════════════════
+// REGISTRO EMAIL (primer paso)
+// ══════════════════════════════════════
+function renderRegistroEmail() {
+  render(`
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 24px;text-align:center;">
+      <div style="font-size:56px;margin-bottom:16px;">👋</div>
+      <h2 style="font-family:'Fredoka One';font-size:32px;color:var(--pink);margin-bottom:8px;">¡Hola!</h2>
+      <p style="font-size:14px;color:var(--text-light);margin-bottom:32px;">Ingresá tu mail para empezar</p>
+      <div style="width:100%;max-width:340px;">
+        <div class="form-group">
+          <input type="email" id="reg-email-inicial" placeholder="tu@email.com" style="text-align:center;font-size:16px;">
+        </div>
+        <button class="btn btn-primary" onclick="verificarEmail()">Continuar →</button>
+        <button class="btn btn-ghost" onclick="renderWelcome()" style="margin-top:8px;">← Volver</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('reg-email-inicial')?.focus(), 100);
+}
+
+async function verificarEmail() {
+  const email = document.getElementById('reg-email-inicial')?.value.trim();
+  if (!email || !email.includes('@')) { toast('Ingresá un email válido', 'error'); return; }
+
+  // Ver si ya existe como miembro
+  const { data } = await sb.from('miembros').select('*').eq('email', email).limit(1);
+  if (data?.length) {
+    currentUser = data[0];
+    localStorage.setItem('elcole_user', JSON.stringify(currentUser));
+    toast('¡Bienvenido/a de nuevo! 👋', 'success');
+    await renderDashboard();
+  } else {
+    renderRegistroCompleto(email);
+  }
+}
+
+// ══════════════════════════════════════
+// LOGIN EXISTENTE
+// ══════════════════════════════════════
+function renderLoginExistente() {
+  render(`
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 24px;text-align:center;">
+      <div style="font-size:56px;margin-bottom:16px;">🔑</div>
+      <h2 style="font-family:'Fredoka One';font-size:32px;color:var(--pink);margin-bottom:8px;">Ingresar</h2>
+      <p style="font-size:14px;color:var(--text-light);margin-bottom:32px;">Ingresá tu mail para acceder</p>
+      <div style="width:100%;max-width:340px;">
+        <div class="form-group">
+          <input type="email" id="login-email" placeholder="tu@email.com" style="text-align:center;font-size:16px;">
+        </div>
+        <button class="btn btn-primary" onclick="loginConEmail()">Ingresar →</button>
+        <button class="btn btn-ghost" onclick="renderWelcome()" style="margin-top:8px;">← Volver</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('login-email')?.focus(), 100);
+}
+
+async function loginConEmail() {
+  const email = document.getElementById('login-email')?.value.trim();
+  if (!email || !email.includes('@')) { toast('Ingresá un email válido', 'error'); return; }
+  const { data } = await sb.from('miembros').select('*').eq('email', email).limit(1);
+  if (data?.length) {
+    currentUser = data[0];
+    localStorage.setItem('elcole_user', JSON.stringify(currentUser));
+    toast('¡Bienvenido/a! 👋', 'success');
+    await renderDashboard();
+  } else {
+    toast('No encontramos tu cuenta. ¿Querés registrarte?', 'error');
+    setTimeout(() => renderRegistroEmail(), 2000);
+  }
+}
+
+// ══════════════════════════════════════
+// REGISTRO COMPLETO (nuevo usuario)
+// ══════════════════════════════════════
+function renderRegistroCompleto(email) {
+  tutorCount = 1;
+  render(`
+    <div>
+      <div class="screen-hero" style="background:linear-gradient(135deg,var(--blue),var(--purple))">
+        <button class="btn-back" onclick="renderWelcome()">← Volver</button>
+        <h2>Completá tus datos</h2>
+        <p>Solo una vez. Después podés unirte a cualquier curso.</p>
+      </div>
+      <div class="screen-content">
+        <div class="card" style="margin-top:0;">
+          <div class="card-title">👤 Tu hijo/a</div>
+          <div class="form-group">
+            <label>Nombre y apellido del alumno/a</label>
+            <input type="text" id="reg-hijo" placeholder="Ej: Sofía González">
+          </div>
+          <div class="form-group">
+            <label>Fecha de cumpleaños</label>
+            <input type="date" id="reg-hijo-cumple">
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">👨‍👩‍👧 Vos (Madre/Padre/Tutor)</div>
+          <div id="tutores-container">
+            <div class="tutor-row">
+              <div class="form-group" style="flex:1;margin-bottom:0;">
+                <label>Nombre y apellido</label>
+                <input type="text" placeholder="Ej: María González" class="tutor-input">
+              </div>
+            </div>
+          </div>
+          <button class="btn-add-tutor" style="margin-top:12px;" onclick="addTutor()">➕ Agregar otro tutor</button>
+        </div>
+        <div class="card">
+          <div class="card-title">📧 Mail</div>
+          <div class="form-group">
+            <input type="email" id="reg-email" value="${email}" readonly style="background:#F5F5F5;color:#999;">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="registrarUsuario('${email}')">✅ Listo, registrarme</button>
+        <div style="height:20px;"></div>
+      </div>
+    </div>
+  `);
+}
+
+async function registrarUsuario(email) {
+  const hijo = document.getElementById('reg-hijo')?.value.trim();
+  const cumple = document.getElementById('reg-hijo-cumple')?.value;
+  const tutores = getTutores('tutor-input');
+
+  if (!hijo || tutores.length === 0) { toast('Completá todos los campos', 'error'); return; }
+
+  // Crear miembro sin curso aún
+  const { data: miembro, error } = await sb.from('miembros').insert({
+    curso_id: null,
+    nombre_hijo: hijo,
+    fecha_cumple_hijo: cumple || null,
+    tutores: tutores,
+    email: email,
+    es_admin: false
+  }).select().single();
+
+  if (error) { toast('Error al registrarse: ' + error.message, 'error'); return; }
+
+  currentUser = miembro;
+  localStorage.setItem('elcole_user', JSON.stringify(miembro));
+  toast('¡Registro listo! Ahora uníte a tu curso 🎉', 'success');
+  await renderDashboard();
+}
+
+// ══════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════
+async function renderDashboard() {
+  if (!currentUser) { renderWelcome(); return; }
+  const nombre = currentUser.tutores?.[0]?.split(' ')[0] || 'Hola';
+
+  // Cargar cursos
+  const { data: miembros } = await sb.from('miembros').select('curso_id').eq('email', currentUser.email).not('curso_id', 'is', null);
+  let cursosHtml = '';
+  let proximoCumpleHtml = '';
+
+  if (miembros?.length) {
+    const ids = miembros.map(m => m.curso_id);
+    const { data: cursos } = await sb.from('cursos').select('*').in('id', ids);
+
+    if (cursos?.length) {
+      cursosHtml = cursos.map(c => `
+        <div class="curso-card" onclick="abrirCurso('${c.id}')">
+          <div class="curso-logo">${c.logo_url ? '<img src="' + c.logo_url + '">' : '🏫'}</div>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:15px;">${c.curso}</div>
+            <div style="font-size:13px;color:var(--text-light);">${c.nombre_colegio}</div>
+          </div>
+          <div class="curso-badge">${c.cantidad_alumnos} alumnos</div>
+        </div>`).join('');
+
+      // Próximo cumple
+      const hoy = new Date().toISOString().split('T')[0];
+      const { data: proxEv } = await sb.from('eventos').select('nombre_cumpleanero,fecha_cumple,curso:curso_id(curso)').in('curso_id', ids).eq('activo', true).gte('fecha_cumple', hoy).order('fecha_cumple').limit(1);
+      if (proxEv?.length) {
+        const ev = proxEv[0];
+        const f = new Date(ev.fecha_cumple + 'T00:00:00');
+        const fechaStr = f.toLocaleDateString('es-AR', {weekday:'long',day:'numeric',month:'long'});
+        proximoCumpleHtml = `
+          <div class="proximo-cumple-card">
+            <span style="font-size:28px;">🎂</span>
+            <div>
+              <div style="font-size:11px;opacity:.8;font-weight:600;letter-spacing:.05em;text-transform:uppercase;">Próximo cumpleaños</div>
+              <div style="font-family:'Fredoka One';font-size:18px;">${ev.nombre_cumpleanero}</div>
+              <div style="font-size:12px;opacity:.85;">${fechaStr} · ${ev.curso?.curso || ''}</div>
+            </div>
+          </div>`;
+      }
+    }
+  }
+
+  if (!cursosHtml) {
+    cursosHtml = `
+      <div class="empty-state">
+        <div class="emoji">🔗</div>
+        <p>Todavía no estás en ningún curso.<br>Unite con el link que te compartieron.</p>
+      </div>`;
+  }
+
+  render(`
+    <div>
+      <div style="background:linear-gradient(135deg,var(--pink),var(--purple));padding:24px 20px 40px;color:white;">
+        <div style="font-size:14px;opacity:.8;">Hola 👋</div>
+        <h2 style="font-family:'Fredoka One';font-size:28px;">${nombre}</h2>
+        ${proximoCumpleHtml}
+      </div>
+      <div style="padding:0 20px;margin-top:-20px;padding-bottom:40px;">
+        <div style="font-family:'Fredoka One';font-size:20px;margin:24px 0 12px;">🏫 Mis cursos</div>
+        ${cursosHtml}
+        <button class="btn btn-secondary" onclick="renderJoin(null)" style="margin-top:8px;">🔗 Unirme a un curso</button>
+      </div>
+    </div>
+  `);
+  setGlobalHeader(true, nombre);
+  cargarNotificaciones();
+}
+
+function setGlobalHeader(visible, nombre) {
+  const header = document.getElementById('global-header');
+  const pill = document.getElementById('header-user-pill');
+  if (!header) return;
+  header.style.display = visible ? 'flex' : 'none';
+  if (pill && nombre) pill.textContent = nombre + ' ☰';
+}
+
+function mostrarPerfil() {
+  if (!currentUser) return;
+  document.getElementById('perfil-content').innerHTML = `
+    <p><b>Hijo/a:</b> ${currentUser.nombre_hijo}</p>
+    <p><b>Tutores:</b> ${currentUser.tutores?.join(', ')}</p>
+    <p><b>Email:</b> ${currentUser.email}</p>
+    ${currentUser.es_admin ? '<p><b>Rol:</b> ⭐ Administrador</p>' : ''}
+  `;
+  showModal('modal-perfil');
+}
+
+function cerrarSesion() {
+  localStorage.removeItem('elcole_user');
+  currentUser = null;
+  closeModal('modal-perfil');
+  renderWelcome();
+}
+
+// ══════════════════════════════════════
+// JOIN — ingresar a un curso
+// ══════════════════════════════════════
+function renderJoin(cursoData) {
+  joinCursoData = cursoData;
+  const titulo = cursoData ? cursoData.curso + ' · ' + cursoData.nombre_colegio : 'Unirme a un curso';
+  const sub = cursoData ? 'Ingresá el código de acceso' : 'Ingresá el código que te compartieron';
+
+  render(`
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px 24px;text-align:center;">
+      <div style="font-size:56px;margin-bottom:12px;">🔐</div>
+      <h2 style="font-family:'Fredoka One';font-size:28px;color:var(--pink);margin-bottom:8px;">${titulo}</h2>
+      <p style="font-size:14px;color:var(--text-light);margin-bottom:32px;">${sub}</p>
+      <div style="width:100%;max-width:340px;">
+        <div class="form-group" style="text-align:center;">
+          <label>Código de acceso</label>
+          <input type="text" id="join-codigo"
+            placeholder="ABC123" maxlength="6"
+            style="text-transform:uppercase;text-align:center;font-family:'Fredoka One';font-size:32px;letter-spacing:8px;padding:16px;"
+            oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+          <div style="font-size:12px;color:var(--text-light);margin-top:8px;">6 caracteres · letras y números</div>
+        </div>
+        <button class="btn btn-primary" onclick="validarCodigo()" style="margin-top:8px;">Ingresar →</button>
+        <button class="btn btn-ghost" onclick="${currentUser ? 'renderDashboard()' : 'renderWelcome()'}" style="margin-top:8px;">← Volver</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('join-codigo')?.focus(), 100);
+}
+
+async function validarCodigo() {
+  const codigo = document.getElementById('join-codigo')?.value.trim().toUpperCase();
+  if (!codigo || codigo.length !== 6) { toast('El código tiene 6 caracteres', 'error'); return; }
+
+  let curso = joinCursoData;
+  if (!curso) {
+    const { data } = await sb.from('cursos').select('*').eq('pin', codigo).single();
+    if (!data) { toast('Código incorrecto, revisalo', 'error'); return; }
+    curso = data;
+  } else if (curso.pin !== codigo) {
+    toast('Código incorrecto, revisalo', 'error'); return;
+  }
+
+  joinCursoData = curso;
+
+  // Si no tiene cuenta, pedir registro
+  if (!currentUser) {
+    renderRegistroMiembro();
+    return;
+  }
+
+  // Verificar si ya es miembro de este curso
+  const { data: existe } = await sb.from('miembros').select('id').eq('curso_id', curso.id).eq('email', currentUser.email).single();
+  if (existe) { toast('Ya sos miembro de ' + curso.curso + ' ✅', 'success'); await renderDashboard(); return; }
+
+  // Agregar al curso
+  await unirseAlCurso();
+}
+
+async function unirseAlCurso() {
+  if (!currentUser || !joinCursoData) return;
+
+  const { data: yaExiste } = await sb.from('miembros').select('id').eq('curso_id', joinCursoData.id).eq('email', currentUser.email).single();
+  if (yaExiste) { toast('Ya sos miembro de este curso ✅', 'success'); await renderDashboard(); return; }
+
+  // Detectar si ya existe un niño con el mismo nombre en el curso
+  const { data: ninoExistente } = await sb.from('miembros')
+    .select('id, nombre_hijo, tutores, fecha_cumple_hijo')
+    .eq('curso_id', joinCursoData.id)
+    .ilike('nombre_hijo', currentUser.nombre_hijo)
+    .limit(1)
+    .single();
+
+  if (ninoExistente) {
+    ninoDuplicadoEncontrado = { miembro: ninoExistente, email: currentUser.email, tutores: currentUser.tutores };
+    const tutoresStr = ninoExistente.tutores?.join(' · ') || 'Sin tutores registrados';
+    const cumpleStr = ninoExistente.fecha_cumple_hijo
+      ? new Date(ninoExistente.fecha_cumple_hijo + 'T00:00:00').toLocaleDateString('es-AR', {day:'numeric', month:'long'})
+      : 'No registrado';
+    document.getElementById('duplicado-info').innerHTML = `
+      <div style="font-weight:800;font-size:16px;margin-bottom:6px;">👤 ${ninoExistente.nombre_hijo}</div>
+      <div style="font-size:13px;color:var(--text-light);">🎂 Cumpleaños: ${cumpleStr}</div>
+      <div style="font-size:13px;color:var(--text-light);margin-top:4px;">👨‍👩‍👧 Tutores actuales: ${tutoresStr}</div>`;
+    showModal('modal-nino-duplicado');
+    return;
+  }
+
+  const { data: miembro, error } = await sb.from('miembros').insert({
+    curso_id: joinCursoData.id,
+    nombre_hijo: currentUser.nombre_hijo,
+    fecha_cumple_hijo: currentUser.fecha_cumple_hijo || null,
+    tutores: currentUser.tutores,
+    email: currentUser.email,
+    es_admin: false
+  }).select().single();
+
+  if (error) { toast('Error al unirse: ' + error.message, 'error'); return; }
+
+  // Agregar al miembro a todos los eventos activos ya existentes en el curso
+  const { data: eventosExistentes } = await sb.from('eventos').select('id').eq('curso_id', joinCursoData.id).eq('activo', true);
+  if (eventosExistentes?.length) {
+    await sb.from('pagos').insert(eventosExistentes.map(ev => ({
+      evento_id: ev.id, miembro_id: miembro.id, pagado: false, asistira: null
+    })));
+  }
+
+  toast('¡Te uniste a ' + joinCursoData.curso + '! 🎉', 'success');
+  await renderDashboard();
+}
+
+// ══════════════════════════════════════
+// REGISTRO MIEMBRO (sin cuenta previa, viene de join)
+// ══════════════════════════════════════
+function renderRegistroMiembro() {
+  joinTutorCount = 1;
+  render(`
+    <div>
+      <div class="screen-hero" style="background:linear-gradient(135deg,var(--blue),var(--purple))">
+        <button class="btn-back" onclick="renderJoin(joinCursoData)">← Volver</button>
+        <h2>¡Bienvenido/a! 👋</h2>
+        <p>${joinCursoData?.curso} · ${joinCursoData?.nombre_colegio}</p>
+      </div>
+      <div class="screen-content">
+        <div class="card" style="margin-top:0;">
+          <div class="card-title">👤 Tu hijo/a</div>
+          <div class="form-group"><label>Nombre y apellido</label><input type="text" id="jm-hijo" placeholder="Ej: Martina López"></div>
+          <div class="form-group"><label>Fecha de cumpleaños</label><input type="date" id="jm-cumple"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">👨‍👩‍👧 Vos (Madre/Padre/Tutor)</div>
+          <div id="jm-tutores">
+            <div class="tutor-row">
+              <div class="form-group" style="flex:1;margin-bottom:0;">
+                <label>Nombre y apellido</label>
+                <input type="text" placeholder="Ej: María González" class="jm-tutor-input">
+              </div>
+            </div>
+          </div>
+          <button class="btn-add-tutor" style="margin-top:12px;" onclick="addJoinTutor()">➕ Agregar otro tutor</button>
+        </div>
+        <div class="card">
+          <div class="form-group"><label>Correo electrónico</label><input type="email" id="jm-email" placeholder="tu@email.com"></div>
+        </div>
+        <button class="btn btn-primary" onclick="registrarMiembro()">✅ Unirme al curso</button>
+        <div style="height:20px;"></div>
+      </div>
+    </div>
+  `);
+}
+
+let ninoDuplicadoEncontrado = null; // miembro existente con mismo nombre
+
+async function registrarMiembro() {
+  const hijo = document.getElementById('jm-hijo')?.value.trim();
+  const cumple = document.getElementById('jm-cumple')?.value;
+  const email = document.getElementById('jm-email')?.value.trim();
+  const tutores = getTutores('jm-tutor-input');
+
+  if (!hijo || !email || tutores.length === 0) { toast('Completá todos los campos', 'error'); return; }
+
+  const { data: existe } = await sb.from('miembros').select('id').eq('curso_id', joinCursoData.id).eq('email', email).single();
+  if (existe) { toast('Ya estás registrado en este curso', 'error'); return; }
+
+  // Detectar si ya existe un niño con el mismo nombre en el curso
+  const { data: ninoExistente } = await sb.from('miembros')
+    .select('id, nombre_hijo, tutores, fecha_cumple_hijo')
+    .eq('curso_id', joinCursoData.id)
+    .ilike('nombre_hijo', hijo)
+    .limit(1)
+    .single();
+
+  if (ninoExistente) {
+    ninoDuplicadoEncontrado = { miembro: ninoExistente, email, tutores };
+    const tutoresStr = ninoExistente.tutores?.join(' · ') || 'Sin tutores registrados';
+    const cumpleStr = ninoExistente.fecha_cumple_hijo
+      ? new Date(ninoExistente.fecha_cumple_hijo + 'T00:00:00').toLocaleDateString('es-AR', {day:'numeric', month:'long'})
+      : 'No registrado';
+    document.getElementById('duplicado-info').innerHTML = `
+      <div style="font-weight:800;font-size:16px;margin-bottom:6px;">👤 ${ninoExistente.nombre_hijo}</div>
+      <div style="font-size:13px;color:var(--text-light);">🎂 Cumpleaños: ${cumpleStr}</div>
+      <div style="font-size:13px;color:var(--text-light);margin-top:4px;">👨‍👩‍👧 Tutores actuales: ${tutoresStr}</div>`;
+    showModal('modal-nino-duplicado');
+    return;
+  }
+
+  await _crearMiembroNuevo({ hijo, cumple, tutores, email, cursoId: joinCursoData.id });
+}
+
+async function confirmarUnirseNinoExistente() {
+  if (!ninoDuplicadoEncontrado) return;
+  const { miembro, email, tutores } = ninoDuplicadoEncontrado;
+
+  // Agregar los tutores nuevos al registro existente del niño (sin duplicar)
+  const tutoresActuales = miembro.tutores || [];
+  const tutoresMerged = [...new Set([...tutoresActuales, ...tutores])];
+
+  // Crear un nuevo registro de miembro para este tutor vinculado al mismo niño
+  const { data: nuevoMiembro, error } = await sb.from('miembros').insert({
+    curso_id: joinCursoData.id,
+    nombre_hijo: miembro.nombre_hijo,
+    fecha_cumple_hijo: miembro.fecha_cumple_hijo || null,
+    tutores: tutoresMerged,
+    email: email,
+    es_admin: false
+  }).select().single();
+
+  if (error) { toast('Error al unirse: ' + error.message, 'error'); return; }
+
+  // Agregar a los eventos activos del curso
+  const { data: eventosExistentes } = await sb.from('eventos').select('id').eq('curso_id', joinCursoData.id).eq('activo', true);
+  if (eventosExistentes?.length) {
+    await sb.from('pagos').insert(eventosExistentes.map(ev => ({
+      evento_id: ev.id, miembro_id: nuevoMiembro.id, pagado: false, asistira: null
+    })));
+  }
+
+  closeModal('modal-nino-duplicado');
+  ninoDuplicadoEncontrado = null;
+  currentUser = nuevoMiembro;
+  localStorage.setItem('elcole_user', JSON.stringify(nuevoMiembro));
+  toast('¡Te sumaste al curso! 🎉', 'success');
+  await renderDashboard();
+}
+
+async function _crearMiembroNuevo({ hijo, cumple, tutores, email, cursoId }) {
+  const { data: miembro, error } = await sb.from('miembros').insert({
+    curso_id: cursoId,
+    nombre_hijo: hijo,
+    fecha_cumple_hijo: cumple || null,
+    tutores: tutores,
+    email: email,
+    es_admin: false
+  }).select().single();
+
+  if (error) { toast('Error: ' + error.message, 'error'); return; }
+
+  // Agregar al miembro a todos los eventos activos ya existentes en el curso
+  const { data: eventosExistentes } = await sb.from('eventos').select('id').eq('curso_id', cursoId).eq('activo', true);
+  if (eventosExistentes?.length) {
+    await sb.from('pagos').insert(eventosExistentes.map(ev => ({
+      evento_id: ev.id, miembro_id: miembro.id, pagado: false, asistira: null
+    })));
+  }
+
+  currentUser = miembro;
+  localStorage.setItem('elcole_user', JSON.stringify(miembro));
+  toast('¡Bienvenido/a al curso! 🎉', 'success');
+  await renderDashboard();
+}
+
+// ══════════════════════════════════════
+// REGISTRAR CURSO (solo desde perfil)
+// ══════════════════════════════════════
+function abrirRegistrarCurso() {
+  closeModal('modal-perfil');
+  tutorCount = 1;
+  logoBase64 = null;
+  render(`
+    <div>
+      <div class="screen-hero">
+        <button class="btn-back" onclick="renderDashboard()">← Mis cursos</button>
+        <h2>Registrá tu curso</h2>
+        <p>Sos el primero. Vos lo armás, el resto se suma.</p>
+      </div>
+      <div class="screen-content">
+        <div class="card" style="margin-top:0;">
+          <div class="card-title">🏫 El colegio</div>
+          <div class="form-group"><label>Nombre del colegio</label><input type="text" id="rc-colegio" placeholder="Ej: Colegio San Martín"></div>
+          <div class="form-group"><label>Curso / Grado</label><input type="text" id="rc-curso" placeholder="Ej: 3° B Primaria"></div>
+          <div class="form-group"><label>Cantidad de alumnos</label><input type="number" id="rc-alumnos" placeholder="Ej: 28" min="1" max="50"></div>
+          <div class="form-group">
+            <label>Logo del colegio (opcional)</label>
+            <div class="logo-upload" onclick="document.getElementById('rc-logo-input').click()">
+              <input type="file" id="rc-logo-input" accept="image/*" onchange="previewLogo(this)">
+              <div id="logo-upload-content"><div style="font-size:36px;margin-bottom:8px;">📸</div><div style="font-size:13px;color:var(--text-light);">Tocá para subir el logo<br><small>Opcional</small></div></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🔐 Código de acceso</div>
+          <div class="card-sub">ElCole genera un código único para que los padres se unan.</div>
+          <div class="codigo-box">
+            <div class="codigo-display" id="codigo-generado" data-codigo="">------</div>
+            <div style="font-size:12px;color:var(--text-light);margin-bottom:12px;">Generado automáticamente</div>
+            <button class="btn-regen" onclick="regenerarCodigo()">🔄 Generar otro</button>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="crearCurso()" id="btn-crear-curso">🚀 Crear el curso</button>
+        <div style="height:20px;"></div>
+      </div>
+    </div>
+  `);
+  regenerarCodigo();
+}
+
+function previewLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    logoBase64 = e.target.result;
+    document.getElementById('logo-upload-content').innerHTML = `<img src="${logoBase64}" class="logo-preview"><div style="font-size:13px;color:var(--text-light);">Tocá para cambiar</div>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function genCode(len) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({length:len}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+}
+function regenerarCodigo() {
+  const c = genCode(6);
+  const el = document.getElementById('codigo-generado');
+  if (el) { el.textContent = c; el.dataset.codigo = c; }
+}
+
+async function crearCurso() {
+  if (!currentUser) { toast('Necesitás estar registrado', 'error'); return; }
+  const colegio = document.getElementById('rc-colegio')?.value.trim();
+  const curso = document.getElementById('rc-curso')?.value.trim();
+  const alumnos = parseInt(document.getElementById('rc-alumnos')?.value);
+  const el = document.getElementById('codigo-generado');
+  const codigo = el?.dataset.codigo || el?.textContent?.trim();
+
+  if (!colegio || !curso || !alumnos || !codigo || codigo === '------') {
+    toast('Completá todos los campos', 'error'); return;
+  }
+
+  const btn = document.getElementById('btn-crear-curso');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
+
+  try {
+    const linkCode = genCode(8);
+    const { data: cursoData, error: cErr } = await sb.from('cursos').insert({
+      nombre_colegio: colegio, curso, cantidad_alumnos: alumnos,
+      logo_url: logoBase64 || null, pin: codigo, link_code: linkCode,
+      creado_por_nombre: currentUser.tutores?.[0] || '',
+      creado_por_email: currentUser.email
+    }).select().single();
+    if (cErr) throw cErr;
+
+    // Crear miembro admin para este curso
+    const { data: miembroAdmin, error: mErr } = await sb.from('miembros').insert({
+      curso_id: cursoData.id,
+      nombre_hijo: currentUser.nombre_hijo,
+      fecha_cumple_hijo: currentUser.fecha_cumple_hijo || null,
+      tutores: currentUser.tutores,
+      email: currentUser.email,
+      es_admin: true
+    }).select().single();
+    if (mErr) throw mErr;
+
+    currentCurso = cursoData;
+    toast('¡Curso creado! 🎉', 'success');
+    renderCompartir(cursoData);
+  } catch(e) {
+    toast('Error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🚀 Crear el curso'; }
+  }
+}
+
+// ══════════════════════════════════════
+// COMPARTIR
+// ══════════════════════════════════════
+function renderCompartir(curso) {
+  render(`
+    <div style="padding:32px 20px 40px;max-width:480px;margin:0 auto;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="font-size:64px;margin-bottom:8px;">🎉</div>
+        <h2 style="font-family:'Fredoka One';font-size:28px;color:var(--pink);">¡Curso creado!</h2>
+        <p style="color:var(--text-light);font-size:14px;margin-top:4px;">Compartí el código con los padres</p>
+      </div>
+      <div class="share-card">
+        <h3>${curso.curso} · ${curso.nombre_colegio}</h3>
+        <p>Código de acceso</p>
+        <div class="pin-display">${curso.pin}</div>
+        <p style="margin-bottom:12px;font-size:13px;">Compartí este mensaje con los padres 👇</p>
+        <button class="btn-copy" onclick="copiarLink()">📋 Copiar mensaje para WhatsApp</button>
+      </div>
+      <div class="card">
+        <p style="font-size:13px;color:var(--text-light);line-height:1.7;">
+          Los padres ingresan el código y completan sus datos. El colegio ya está cargado. ✅
+        </p>
+      </div>
+      <button class="btn btn-primary" onclick="renderDashboard()">Ir a mis cursos →</button>
+    </div>
+  `);
+}
+
+function compartirCurso() {
+  if (!currentCurso) return;
+  const url = window.location.origin + window.location.pathname;
+  const msg = 'ElCole - Unite al curso ' + currentCurso.curso + ' de ' + currentCurso.nombre_colegio
+    + '\n\nCodigo de acceso: ' + currentCurso.pin
+    + '\n\n1) Entra a: ' + url
+    + '\n2) Toca Unirme a un curso'
+    + '\n3) Ingresa el codigo: ' + currentCurso.pin
+    + '\n\nEn 2 minutos ya estas adentro!';
+  navigator.clipboard.writeText(msg)
+    .then(() => toast('Copiado! Pegalo en WhatsApp', 'success'))
+    .catch(() => toast('No se pudo copiar', 'error'));
+}
+
+
+function copiarLink() {
+  if (!currentCurso) return;
+  const url = window.location.origin + window.location.pathname;
+  const msg = '🎒 *ElCole* — Unite al curso "' + currentCurso.curso + '" de ' + currentCurso.nombre_colegio + '\n\n🔗 ' + url + '\n🔐 Código: ' + currentCurso.pin + '\n\nIngresá a ElCole y tocá "Unirme a un curso"';
+  navigator.clipboard.writeText(msg).then(() => toast('¡Copiado! Pegalo en WhatsApp 📋', 'success')).catch(() => toast('No se pudo copiar', 'error'));
+}
+
+// ══════════════════════════════════════
+// CURSO DETALLE
+// ══════════════════════════════════════
+async function abrirCurso(cursoId) {
+  const { data: curso } = await sb.from('cursos').select('*').eq('id', cursoId).single();
+  if (!curso) { toast('Error al cargar', 'error'); return; }
+  currentCurso = curso;
+
+  const { data: miembroActual } = await sb.from('miembros').select('es_admin').eq('curso_id', cursoId).eq('email', currentUser?.email).single();
+  const esAdmin = miembroActual?.es_admin || false;
+
+  render(`
+    <div>
+      <div style="background:linear-gradient(135deg,var(--pink),#FF9A9E);padding:20px 20px 44px;color:white;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+          <button class="btn-back" onclick="renderDashboard()">← Mis cursos</button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${esAdmin ? `<button onclick="verFamilias()" style="background:rgba(255,255,255,.25);border:none;border-radius:999px;padding:7px 14px;color:white;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">👨‍👩‍👧 Familias</button>
+            <button onclick="showModal('modal-editar-curso');cargarEditorCurso()" style="background:rgba(255,255,255,.25);border:none;border-radius:999px;padding:7px 14px;color:white;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">✏️ Editar</button>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="flex:1;">
+            <h2 style="font-family:'Fredoka One';font-size:26px;margin-bottom:2px;">${curso.curso}</h2>
+            <p style="font-size:13px;opacity:.85;margin-bottom:10px;">${curso.nombre_colegio}</p>
+            ${esAdmin ? `<div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.2);border-radius:999px;padding:6px 12px;">
+              <span style="font-size:11px;font-weight:700;opacity:.9;">🔐 Código:</span>
+              <span style="font-family:'Fredoka One';font-size:17px;letter-spacing:4px;">${curso.pin}</span>
+              <button onclick="compartirCurso()" style="background:rgba(255,255,255,.3);border:none;border-radius:999px;padding:4px 10px;color:white;font-family:Nunito;font-size:11px;font-weight:700;cursor:pointer;">WhatsApp</button>
+            </div>` : ''}
+          </div>
+          <div style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden;flex-shrink:0;">
+            ${curso.logo_url ? '<img src="' + curso.logo_url + '" style="width:100%;height:100%;object-fit:cover;">' : '🏫'}
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:0 20px;margin-top:-20px;padding-bottom:100px;">
+        <div class="tabs" style="margin-top:0;">
+          <button class="tab active" id="tab-ev" onclick="switchCursoTab('ev')">🎂 Cumpleaños</button>
+          <button class="tab" id="tab-ret" onclick="switchCursoTab('ret')">🚗 Retiros</button>
+        </div>
+        <div id="panel-ev"></div>
+        <div id="panel-ret" style="display:none;"></div>
+      </div>
+      <button class="fab" id="fab-curso" onclick="onFabCurso()">🎂</button>
+    </div>
+  `);
+  cargarEditorCurso();
+  await cargarEventos();
+}
+
+function switchCursoTab(tab) {
+  document.getElementById('panel-ev').style.display = tab === 'ev' ? 'block' : 'none';
+  document.getElementById('panel-ret').style.display = tab === 'ret' ? 'block' : 'none';
+  document.getElementById('tab-ev').className = 'tab' + (tab==='ev'?' active':'');
+  document.getElementById('tab-ret').className = 'tab' + (tab==='ret'?' active':'');
+  // FAB dinámico según pestaña
+  const fab = document.getElementById('fab-curso');
+  if (fab) { fab.textContent = tab === 'ev' ? '🎂' : '🚗'; }
+  currentTab = tab;
+  if (tab === 'ev') cargarEventos();
+  else cargarRetiros();
+}
+
+function onFabCurso() {
+  if (currentTab === 'ev') abrirNuevoEvento();
+  else abrirNuevoRetiro();
+}
+
+function verFamilias() {
+  // Panel full-screen de familias sobre el curso actual
+  render(`
+    <div>
+      <div style="background:linear-gradient(135deg,var(--pink),#FF9A9E);padding:20px 20px 36px;color:white;">
+        <button class="btn-back" onclick="abrirCurso('${currentCurso.id}')">← Volver al curso</button>
+        <h2 style="font-family:'Fredoka One';font-size:24px;margin-top:10px;">👨‍👩‍👧 Familias</h2>
+        <p style="font-size:13px;opacity:.85;">${currentCurso.curso} · ${currentCurso.nombre_colegio}</p>
+      </div>
+      <div style="padding:16px 20px 80px;" id="panel-familias"><p style="color:var(--text-light);text-align:center;padding:40px 0;">Cargando...</p></div>
+    </div>
+  `);
+  cargarMiembros('panel-familias');
+}
+
+async function cargarRetiros() {
+  const panel = document.getElementById('panel-ret');
+  if (!panel) return;
+
+  // Traer el miembro actual del curso
+  const { data: miembroActual } = await sb.from('miembros')
+    .select('id').eq('curso_id', currentCurso.id).eq('email', currentUser.email).single();
+
+  // Todos los IDs de miembro del usuario en este curso (puede tener más de uno)
+  const { data: misPerfil } = await sb.from('miembros')
+    .select('id').eq('curso_id', currentCurso.id).eq('email', currentUser.email);
+  const misMiembroIds = (misPerfil || []).map(m => m.id);
+  // Incluir también currentUser.id por si acaso
+  if (currentUser.id && !misMiembroIds.includes(currentUser.id)) misMiembroIds.push(currentUser.id);
+
+  // Retiros donde soy creador
+  let retirosCreados = [];
+  if (misMiembroIds.length) {
+    const { data } = await sb.from('retiros')
+      .select('*').eq('curso_id', currentCurso.id).in('creador_id', misMiembroIds)
+      .order('fecha', { ascending: false });
+    retirosCreados = data || [];
+  }
+
+  // Retiros donde soy aprobador (estoy en retiro_aprobaciones)
+  const { data: misAprobaciones } = await sb.from('retiro_aprobaciones')
+    .select('retiro_id').eq('email', currentUser.email);
+  const idsInvolucrado = (misAprobaciones || []).map(a => a.retiro_id);
+
+  let retirosInvolucrado = [];
+  if (idsInvolucrado.length) {
+    const { data } = await sb.from('retiros').select('*').in('id', idsInvolucrado).order('fecha', { ascending: false });
+    retirosInvolucrado = data || [];
+  }
+
+  // Merge sin duplicados
+  const todos = [...(retirosCreados || [])];
+  for (const r of retirosInvolucrado) {
+    if (!todos.find(x => x.id === r.id)) todos.push(r);
+  }
+  todos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  if (!todos.length) {
+    panel.innerHTML = `
+      <div class="empty-state">
+        <div class="emoji">🚗</div>
+        <p style="font-weight:700;font-size:15px;margin-bottom:8px;">Sin retiros registrados</p>
+        <p style="font-size:13px;color:var(--text-light);line-height:1.6;max-width:280px;margin:0 auto;">Tocá 🚗 para registrar quién retira a un niño/a del colegio.</p>
+      </div>`;
+    return;
+  }
+
+  panel.innerHTML = todos.map(r => {
+    const f = new Date(r.fecha + 'T00:00:00');
+    const soyCreador = misMiembroIds.includes(r.creador_id);
+    const estadoBadge = r.estado === 'aprobado'
+      ? '<span style="background:#D1FAE5;color:#065F46;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;">✅ Aprobado</span>'
+      : r.estado === 'pendiente'
+      ? '<span style="background:#FEF3C7;color:#92400E;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;">⏳ Pendiente</span>'
+      : '<span style="background:#FEE2E2;color:#991B1B;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;">❌ Rechazado</span>';
+    const rolBadge = soyCreador
+      ? '<span style="background:#EDE9FE;color:#5B21B6;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:6px;">Creador</span>'
+      : '<span style="background:#FEF3C7;color:#92400E;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:6px;">Aprobación requerida</span>';
+    return `<div class="evento-card" onclick="abrirRetiro('${r.id}')">
+      <div class="evento-fecha-badge"><div class="dia">${f.getDate()}</div><div class="mes">${f.toLocaleString('es',{month:'short'}).toUpperCase()}</div></div>
+      <div style="flex:1;">
+        <div style="font-weight:800;font-size:14px;margin-bottom:4px;">🚗 ${r.adulto_nombre}${rolBadge}</div>
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:4px;">Retira: ${(r.ninos || []).join(', ')}</div>
+        ${estadoBadge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function cargarEventos() {
+  const panel = document.getElementById('panel-ev');
+  if (!panel) return;
+  const { data: eventos } = await sb.from('eventos').select('*').eq('curso_id', currentCurso.id).eq('activo', true).order('fecha_cumple');
+  if (!eventos?.length) {
+    panel.innerHTML = '<div class="empty-state"><div class="emoji">🎂</div><p>No hay cumpleaños todavía.<br>Tocá el botón 🎂 para agregar.</p></div>';
+    return;
+  }
+  const html = await Promise.all(eventos.map(async ev => {
+    const { data: pagos } = await sb.from('pagos').select('pagado').eq('evento_id', ev.id);
+    const total = pagos?.length || 0;
+    const pagados = pagos?.filter(p => p.pagado).length || 0;
+    const pct = total > 0 ? Math.round(pagados/total*100) : 0;
+    const f = new Date(ev.fecha_cumple + 'T00:00:00');
+    return `<div class="evento-card" onclick="abrirEvento('${ev.id}')">
+      <div class="evento-fecha-badge"><div class="dia">${f.getDate()}</div><div class="mes">${f.toLocaleString('es',{month:'short'}).toUpperCase()}</div></div>
+      <div style="flex:1;">
+        <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🎂 ${ev.nombre_cumpleanero}</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div style="font-size:11px;color:var(--text-light);margin-top:3px;">${pagados} de ${total} pagaron · ${pct}%</div>
+      </div>
+    </div>`;
+  }));
+  panel.innerHTML = html.join('');
+}
+
+async function cargarMiembros(panelId = 'panel-mb') {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  const { data: miembros } = await sb.from('miembros').select('*').eq('curso_id', currentCurso.id).order('nombre_hijo');
+  if (!miembros?.length) { panel.innerHTML = '<div class="empty-state"><div class="emoji">👥</div><p>Sin miembros.</p></div>'; return; }
+  panel.innerHTML = miembros.map(m => `
+    <div class="miembro-row">
+      <div class="miembro-avatar">${m.nombre_hijo?.charAt(0)?.toUpperCase() || '?'}</div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:14px;">👤 ${m.nombre_hijo}</div>
+        <div style="font-size:12px;color:var(--text-light);">${m.tutores?.join(' · ') || ''}</div>
+      </div>
+      ${m.es_admin ? '<span class="badge-admin">Admin</span>' : ''}
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════
+// EVENTO DETALLE
+// ══════════════════════════════════════
+async function abrirEvento(eventoId) {
+  const { data: ev } = await sb.from('eventos').select('*').eq('id', eventoId).single();
+  if (!ev) return;
+  currentEvento = ev;
+  const soyCreador = ev.creador_id === currentUser?.id;
+
+  // Detectar si soy el padre del cumpleañero (mi miembro_id coincide con el del evento)
+  const { data: misMiembros } = await sb.from('miembros').select('id').eq('email', currentUser.email);
+  const misMiembroIds = (misMiembros || []).map(m => m.id);
+  const soyPadreCumpleanero = ev.miembro_id && misMiembroIds.includes(ev.miembro_id);
+
+  // Fecha del evento (fiesta / colecta)
+  const fEvento = new Date(ev.fecha_cumple + 'T00:00:00');
+  const fechaEventoStr = fEvento.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
+
+  // Fecha de cumple real del niño — guardado directamente en el evento al crearlo
+  let fechaCumpleRealHtml = '';
+  const cumpleReal = ev.miembro_cumple_real;
+  if (cumpleReal) {
+    const fReal = new Date(cumpleReal + 'T00:00:00');
+    const fechaRealStr = fReal.toLocaleDateString('es-AR', {day:'numeric', month:'long'});
+    fechaCumpleRealHtml = `<div style="margin-top:6px;background:rgba(255,255,255,.2);border-radius:999px;padding:4px 14px;display:inline-block;font-size:12px;opacity:.9;">🎂 Cumple real: ${fechaRealStr}</div>`;
+  }
+
+  let invHtml = '';
+  if (ev.tiene_invitacion && ev.domicilio) {
+    const mapsQuery = encodeURIComponent((ev.nombre_salon ? ev.nombre_salon + ' ' : '') + ev.domicilio + ' ' + ev.ciudad);
+    const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + mapsQuery;
+    const salonLine = ev.nombre_salon ? '<div>🎊 <b>' + ev.nombre_salon + '</b></div>' : '';
+    invHtml = `<div class="card">
+      <div class="card-title">🎉 Datos de la fiesta</div>
+      <div style="font-size:14px;line-height:1.9;">
+        <div>📍 <b>${ev.tipo_lugar || ''}</b></div>
+        ${salonLine}
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span>🏠 ${ev.domicilio}, ${ev.ciudad}</span>
+          <a href="${mapsUrl}" target="_blank" style="background:var(--blue);color:white;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;text-decoration:none;flex-shrink:0;">📍 Ver en Maps</a>
+        </div>
+        <div>🕐 ${ev.horario_desde} a ${ev.horario_hasta}</div>
+      </div>
+    </div>`;
+  }
+
+  render(`
+    <div>
+      <div style="background:linear-gradient(135deg,#FFD93D,#FF6B9D);padding:24px 20px 44px;text-align:center;color:white;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <button onclick="abrirCurso('${currentCurso?.id}')" style="background:rgba(255,255,255,.25);border:none;border-radius:999px;padding:7px 14px;color:white;font-family:'Nunito';font-size:13px;font-weight:700;cursor:pointer;">← Volver</button>
+          ${soyCreador ? '<button onclick="abrirEditorEvento()" style="background:rgba(255,255,255,.25);border:none;border-radius:999px;padding:7px 14px;color:white;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">✏️ Editar</button>' : '<div></div>'}
+        </div>
+        <div style="font-size:52px;margin-bottom:8px;">🎉</div>
+        <h2 style="font-family:'Fredoka One';font-size:30px;margin-bottom:4px;">${ev.nombre_cumpleanero}</h2>
+        ${ev.tiene_invitacion
+          ? `<div style="font-family:'Fredoka One';font-size:18px;margin-bottom:2px;">🎊 Fiesta: ${fechaEventoStr}</div>
+             ${fechaCumpleRealHtml}`
+          : `<div style="font-size:14px;opacity:.9;">${fechaEventoStr}</div>
+             ${fechaCumpleRealHtml}`
+        }
+      </div>
+      <div style="padding:0 20px;margin-top:-20px;padding-bottom:40px;">
+        <div class="transfer-box">
+          <h4 style="font-family:'Fredoka One';color:#16A34A;font-size:18px;margin-bottom:12px;">💸 ¿Cómo transferir?</h4>
+          <div class="transfer-row"><span style="font-size:13px;color:var(--text-light);font-weight:600;">Junta</span><span style="font-size:15px;font-weight:800;">${ev.titular_cuenta}</span></div>
+          <div class="transfer-row">
+            <span style="font-size:13px;color:var(--text-light);font-weight:600;">Alias</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:15px;font-weight:800;">${ev.alias_cuenta}</span>
+              <button onclick="navigator.clipboard.writeText('${ev.alias_cuenta}').then(()=>toast('¡Alias copiado! 📋','success'))" style="background:#D1FAE5;border:none;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:16px;" title="Copiar alias">📋</button>
+            </div>
+          </div>
+          ${ev.monto_sugerido ? '<div class="transfer-row"><span style="font-size:13px;color:var(--text-light);font-weight:600;">Monto</span><span style="font-size:15px;font-weight:800;">$' + ev.monto_sugerido + '</span></div>' : ''}
+        </div>
+        ${invHtml}
+        ${soyPadreCumpleanero ? `
+        <div class="card" style="background:linear-gradient(135deg,#FFF5F9,#F5F0FF);border:2px solid #F0C0E0;text-align:center;padding:20px;">
+          <div style="font-size:36px;margin-bottom:8px;">🎨</div>
+          <div style="font-family:'Fredoka One';font-size:18px;color:var(--pink);margin-bottom:6px;">Crear invitación digital</div>
+          <div style="font-size:13px;color:var(--text-light);margin-bottom:16px;line-height:1.5;">Generá una tarjeta personalizada con la temática que elijas para compartir por WhatsApp</div>
+          <button onclick="abrirGeneradorInvitacion()" style="background:var(--pink);color:white;border:none;border-radius:999px;padding:12px 24px;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;width:100%;">🎨 Generar invitación</button>
+        </div>` : ''}
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div class="card-title">💸 Pagos</div>
+            <div id="stats-pagos" style="font-size:13px;color:var(--text-light);"></div>
+          </div>
+          <div class="progress-bar" style="margin-bottom:16px;"><div class="progress-fill" id="fill-pagos" style="width:0%"></div></div>
+          <div id="lista-pagos"><p style="color:var(--text-light);text-align:center;padding:20px 0;font-size:14px;">Cargando...</p></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <div class="card-title">✅ Asistencia</div>
+            <div id="stats-asistencia" style="font-size:13px;color:var(--text-light);"></div>
+          </div>
+          <div class="progress-bar" style="margin-bottom:16px;"><div class="progress-fill" id="fill-asistencia" style="width:0%;background:linear-gradient(90deg,var(--green),#22C55E);"></div></div>
+          <div id="lista-asistencia"><p style="color:var(--text-light);text-align:center;padding:20px 0;font-size:14px;">Cargando...</p></div>
+        </div>
+      </div>
+    </div>
+  `);
+  await cargarPagos(eventoId);
+  await cargarAsistencia(eventoId);
+}
+
+async function cargarPagos(eventoId) {
+  const { data: pagos } = await sb.from('pagos').select('*, miembro:miembro_id(id,nombre_hijo,tutores,email)').eq('evento_id', eventoId);
+  if (!pagos?.length) { document.getElementById('lista-pagos').innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px 0;font-size:14px;">Sin registros.</p>'; return; }
+  pagos.sort((a, b) => (a.miembro?.nombre_hijo || '').localeCompare(b.miembro?.nombre_hijo || '', 'es'));
+  const pagados = pagos.filter(p => p.pagado).length;
+  const pct = Math.round(pagados/pagos.length*100);
+  document.getElementById('stats-pagos').textContent = pagados + '/' + pagos.length + ' pagaron';
+  document.getElementById('fill-pagos').style.width = pct + '%';
+  const soyCreador = currentEvento?.creador_id === currentUser?.id;
+  document.getElementById('lista-pagos').innerHTML = pagos.map(p => {
+    const m = p.miembro;
+    return `<div class="pago-row">
+      <div><div style="font-weight:700;font-size:14px;">👤 ${m?.nombre_hijo||'Alumno'}</div><div style="font-size:12px;color:var(--text-light);">${m?.tutores?.join(', ')||''}</div></div>
+      <div>${p.pagado ? '<span class="badge-pagado">✅ Pagó</span>' : soyCreador ? '<button class="btn-marcar" onclick="marcarPago(\'' + p.id + '\',\'' + eventoId + '\')">Marcar pago</button>' : '<span class="badge-pendiente">⏳ Pendiente</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+async function cargarAsistencia(eventoId) {
+  const { data: pagos } = await sb.from('pagos').select('*, miembro:miembro_id(id,nombre_hijo,tutores,email)').eq('evento_id', eventoId);
+  if (!pagos?.length) { document.getElementById('lista-asistencia').innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px 0;font-size:14px;">Sin registros.</p>'; return; }
+  pagos.sort((a, b) => (a.miembro?.nombre_hijo || '').localeCompare(b.miembro?.nombre_hijo || '', 'es'));
+  const conf = pagos.filter(p => p.asistira !== null).length;
+  const van = pagos.filter(p => p.asistira === true).length;
+  const pct = Math.round(conf/pagos.length*100);
+  document.getElementById('stats-asistencia').textContent = conf + '/' + pagos.length + ' respondieron · ' + van + ' van';
+  const pctBarra = Math.round(van/pagos.length*100);
+  document.getElementById('fill-asistencia').style.width = pctBarra + '%';
+  document.getElementById('lista-asistencia').innerHTML = pagos.map(p => {
+    const m = p.miembro;
+    // soyYo: el miembro del pago tiene el mismo email que el usuario logueado
+    const soyYo = m?.email === currentUser?.email || p.miembro_id === currentUser?.id;
+    let badge = p.asistira === true ? '<span class="badge-pagado">✅ Va</span>' : p.asistira === false ? '<span style="background:#FEE2E2;color:#DC2626;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;">❌ No va</span>' : '<span class="badge-pendiente">⏳ Sin confirmar</span>';
+    let btns = '';
+    if (soyYo && p.asistira === null) btns = '<button class="btn-marcar" style="background:var(--green);margin-left:4px;" onclick="confirmarAsistencia(\'' + p.id + '\',true,\'' + eventoId + '\')">✅ Voy</button><button class="btn-marcar" style="background:#EF4444;margin-left:4px;" onclick="confirmarAsistencia(\'' + p.id + '\',false,\'' + eventoId + '\')">❌ No voy</button>';
+    else if (soyYo) btns = '<button class="btn-marcar" style="background:#888;margin-left:4px;font-size:11px;" onclick="confirmarAsistencia(\'' + p.id + '\',null,\'' + eventoId + '\')">Cambiar</button>';
+    return `<div class="pago-row"><div><div style="font-weight:700;font-size:14px;">👤 ${m?.nombre_hijo||'Alumno'}</div><div style="font-size:12px;color:var(--text-light);">${m?.tutores?.join(', ')||''}</div></div><div style="display:flex;align-items:center;gap:4px;">${badge}${btns}</div></div>`;
+  }).join('');
+}
+
+async function marcarPago(pagoId, eventoId) {
+  const { error } = await sb.from('pagos').update({pagado:true, marcado_por:currentUser.id, fecha_pago:new Date().toISOString()}).eq('id', pagoId);
+  if (error) { toast('Error', 'error'); return; }
+  toast('¡Pago registrado! ✅', 'success');
+  await cargarPagos(eventoId);
+}
+
+async function confirmarAsistencia(pagoId, valor, eventoId) {
+  await sb.from('pagos').update({asistira: valor}).eq('id', pagoId);
+  toast(valor === true ? '¡Confirmado! 🎉' : valor === false ? 'Entendido 👍' : 'Respuesta borrada', 'success');
+  await cargarAsistencia(eventoId);
+}
+
+// ══════════════════════════════════════
+// CREAR EVENTO
+// ══════════════════════════════════════
+let invEvento = false;
+let ninosCurso = []; // cache de miembros del curso para el select
+
+async function abrirNuevoEvento() {
+  // Cargar niños del curso en el select
+  const { data: miembros } = await sb.from('miembros').select('id,nombre_hijo,fecha_cumple_hijo,tutores').eq('curso_id', currentCurso.id).order('nombre_hijo');
+  ninosCurso = miembros || [];
+  const select = document.getElementById('ev-nino-select');
+  if (!select) return;
+  select.innerHTML = '<option value="">Seleccioná un niño/a...</option>' +
+    ninosCurso.map(m => `<option value="${m.id}" data-nombre="${m.nombre_hijo}" data-cumple="${m.fecha_cumple_hijo || ''}">${m.nombre_hijo}</option>`).join('');
+  // Reset campos
+  document.getElementById('ev-fecha').value = '';
+  document.getElementById('ev-fecha-cumple-hint').style.display = 'none';
+  invEvento = false;
+  const invF = document.getElementById('inv-fields');
+  if (invF) invF.style.display = 'none';
+  showModal('modal-nuevo-evento');
+}
+
+function autocompletarCumple() {
+  const select = document.getElementById('ev-nino-select');
+  const opt = select.options[select.selectedIndex];
+  const cumple = opt?.dataset?.cumple;
+  const hint = document.getElementById('ev-fecha-cumple-hint');
+  const hintSpan = document.getElementById('ev-fecha-cumple-real');
+  if (cumple) {
+    // Autocompletar fecha del evento con el cumple real como sugerencia
+    document.getElementById('ev-fecha').value = cumple;
+    const f = new Date(cumple + 'T00:00:00');
+    hintSpan.textContent = f.toLocaleDateString('es-AR', {day:'numeric', month:'long'});
+    hint.style.display = 'block';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+function toggleInv(val) {
+  invEvento = val;
+  document.getElementById('inv-fields').style.display = val ? 'block' : 'none';
+  document.getElementById('btn-inv-si').style.cssText = val ? 'flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid var(--pink);background:var(--pink);color:white;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;' : 'flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid #F0E8FF;background:white;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;';
+  document.getElementById('btn-inv-no').style.cssText = !val ? 'flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid var(--pink);background:var(--pink);color:white;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;' : 'flex:1;padding:12px;border-radius:var(--radius-sm);border:2px solid #F0E8FF;background:white;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;';
+}
+
+async function crearEvento() {
+  const select = document.getElementById('ev-nino-select');
+  const opt = select?.options[select.selectedIndex];
+  const nombre = opt?.dataset?.nombre || '';
+  const fecha = document.getElementById('ev-fecha')?.value;
+  const titular = document.getElementById('ev-titular')?.value.trim();
+  const alias = document.getElementById('ev-alias')?.value.trim();
+  const monto = document.getElementById('ev-monto')?.value;
+  if (!nombre || !fecha || !titular || !alias) { toast('Completá los campos obligatorios', 'error'); return; }
+  const tipoLugar = invEvento ? document.getElementById('ev-tipo-lugar')?.value : null;
+  const domicilio = invEvento ? document.getElementById('ev-domicilio')?.value.trim() : null;
+  const ciudad = invEvento ? document.getElementById('ev-ciudad')?.value.trim() : null;
+  const desde = invEvento ? document.getElementById('ev-desde')?.value : null;
+  const hasta = invEvento ? document.getElementById('ev-hasta')?.value : null;
+  if (invEvento && (!tipoLugar || !domicilio || !ciudad || !desde || !hasta)) { toast('Completá los datos de la fiesta', 'error'); return; }
+
+  const insertData = {
+    curso_id: currentCurso.id, nombre_cumpleanero: nombre, fecha_cumple: fecha,
+    creador_id: currentUser.id, titular_cuenta: titular, alias_cuenta: alias,
+    monto_sugerido: monto || null, tiene_invitacion: invEvento,
+    tipo_lugar: tipoLugar,
+    nombre_salon: (tipoLugar === 'Salón de fiestas') ? document.getElementById('ev-salon-nombre')?.value.trim() : null,
+    domicilio, ciudad, horario_desde: desde, horario_hasta: hasta
+  };
+
+  // Intentar con columnas nuevas; si fallan, insertar sin ellas
+  let ev, error;
+  ({ data: ev, error } = await sb.from('eventos').insert({
+    ...insertData,
+    miembro_id: opt?.value || null,
+    miembro_cumple_real: opt?.dataset?.cumple || null
+  }).select().single());
+
+  if (error) {
+    console.warn('Insert con columnas nuevas falló, reintentando sin ellas:', error.message);
+    ({ data: ev, error } = await sb.from('eventos').insert(insertData).select().single());
+  }
+
+  if (error) { toast('Error al crear: ' + error.message, 'error'); console.error(error); return; }
+
+  const { data: miembros } = await sb.from('miembros').select('id,email').eq('curso_id', currentCurso.id);
+  if (miembros?.length) await sb.from('pagos').insert(miembros.map(m => ({evento_id: ev.id, miembro_id: m.id, pagado: false, asistira: null})));
+
+  // Notificar a todos los miembros del curso
+  await crearNotificaciones({
+    cursoId: currentCurso.id,
+    excluirEmail: currentUser.email,
+    tipo: 'cumple',
+    titulo: '🎂 Nuevo cumpleaños',
+    cuerpo: `Se creó el cumpleaños de ${nombre} en ${currentCurso.curso}. ¡Coordiná el regalo!`
+  });
+
+  closeModal('modal-nuevo-evento');
+  toast('¡Cumpleaños creado! 🎉', 'success');
+  ['ev-fecha','ev-titular','ev-alias','ev-monto'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  invEvento = false;
+  const invF = document.getElementById('inv-fields');
+  if (invF) invF.style.display = 'none';
+  await cargarEventos();
+}
+
+// ══════════════════════════════════════
+// EDITAR EVENTO
+// ══════════════════════════════════════
+let editInvEvento = false;
+function toggleEditInv(val) {
+  editInvEvento = val;
+  document.getElementById('edit-inv-fields').style.display = val ? 'block' : 'none';
+  document.getElementById('edit-btn-inv-si').style.background = val ? 'var(--pink)' : 'white';
+  document.getElementById('edit-btn-inv-si').style.color = val ? 'white' : 'var(--text)';
+  document.getElementById('edit-btn-inv-no').style.background = !val ? 'var(--pink)' : 'white';
+  document.getElementById('edit-btn-inv-no').style.color = !val ? 'white' : 'var(--text)';
+}
+
+function abrirEditorEvento() {
+  const ev = currentEvento;
+  if (!ev) return;
+  document.getElementById('edit-ev-nombre').value = ev.nombre_cumpleanero || '';
+  document.getElementById('edit-ev-fecha').value = ev.fecha_cumple || '';
+  document.getElementById('edit-ev-titular').value = ev.titular_cuenta || '';
+  document.getElementById('edit-ev-alias').value = ev.alias_cuenta || '';
+  document.getElementById('edit-ev-monto').value = ev.monto_sugerido || '';
+  document.getElementById('edit-ev-tipo-lugar').value = ev.tipo_lugar || '';
+  const editSalonGroup = document.getElementById('edit-ev-salon-nombre-group');
+  if (editSalonGroup) editSalonGroup.style.display = ev.tipo_lugar === 'Salón de fiestas' ? 'block' : 'none';
+  document.getElementById('edit-ev-salon-nombre').value = ev.nombre_salon || '';
+  document.getElementById('edit-ev-domicilio').value = ev.domicilio || '';
+  document.getElementById('edit-ev-ciudad').value = ev.ciudad || '';
+  actualizarMapsLink('edit-ev');
+  document.getElementById('edit-ev-desde').value = ev.horario_desde || '';
+  document.getElementById('edit-ev-hasta').value = ev.horario_hasta || '';
+  editInvEvento = ev.tiene_invitacion || false;
+  document.getElementById('edit-inv-fields').style.display = editInvEvento ? 'block' : 'none';
+  document.getElementById('edit-btn-inv-si').style.background = editInvEvento ? 'var(--pink)' : 'white';
+  document.getElementById('edit-btn-inv-si').style.color = editInvEvento ? 'white' : 'var(--text)';
+  document.getElementById('edit-btn-inv-no').style.background = !editInvEvento ? 'var(--pink)' : 'white';
+  document.getElementById('edit-btn-inv-no').style.color = !editInvEvento ? 'white' : 'var(--text)';
+  showModal('modal-editar-evento');
+}
+
+async function guardarEdicionEvento() {
+  const nombre = document.getElementById('edit-ev-nombre')?.value.trim();
+  const fecha = document.getElementById('edit-ev-fecha')?.value;
+  const titular = document.getElementById('edit-ev-titular')?.value.trim();
+  const alias = document.getElementById('edit-ev-alias')?.value.trim();
+  if (!nombre || !fecha || !titular || !alias) { toast('Completá los campos', 'error'); return; }
+  const { error } = await sb.from('eventos').update({
+    nombre_cumpleanero: nombre, fecha_cumple: fecha, titular_cuenta: titular, alias_cuenta: alias,
+    monto_sugerido: document.getElementById('edit-ev-monto')?.value || null,
+    tiene_invitacion: editInvEvento,
+    tipo_lugar: editInvEvento ? document.getElementById('edit-ev-tipo-lugar')?.value : null,
+    nombre_salon: (editInvEvento && document.getElementById('edit-ev-tipo-lugar')?.value === 'Salón de fiestas') ? document.getElementById('edit-ev-salon-nombre')?.value.trim() : null,
+    domicilio: editInvEvento ? document.getElementById('edit-ev-domicilio')?.value.trim() : null,
+    ciudad: editInvEvento ? document.getElementById('edit-ev-ciudad')?.value.trim() : null,
+    horario_desde: editInvEvento ? document.getElementById('edit-ev-desde')?.value : null,
+    horario_hasta: editInvEvento ? document.getElementById('edit-ev-hasta')?.value : null
+  }).eq('id', currentEvento.id);
+  if (error) { toast('Error al guardar', 'error'); return; }
+  toast('¡Guardado! ✅', 'success');
+  closeModal('modal-editar-evento');
+  await abrirEvento(currentEvento.id);
+}
+
+// ══════════════════════════════════════
+// EDITAR CURSO
+// ══════════════════════════════════════
+function cargarEditorCurso() {
+  if (!currentCurso) return;
+  const el = document.getElementById('edit-curso-colegio');
+  if (el) {
+    el.value = currentCurso.nombre_colegio || '';
+    document.getElementById('edit-curso-nombre').value = currentCurso.curso || '';
+    document.getElementById('edit-curso-alumnos').value = currentCurso.cantidad_alumnos || '';
+  }
+}
+
+async function guardarEdicionCurso() {
+  const colegio = document.getElementById('edit-curso-colegio')?.value.trim();
+  const nombre = document.getElementById('edit-curso-nombre')?.value.trim();
+  const alumnos = parseInt(document.getElementById('edit-curso-alumnos')?.value);
+  if (!colegio || !nombre || !alumnos) { toast('Completá todos los campos', 'error'); return; }
+  const { error } = await sb.from('cursos').update({nombre_colegio:colegio, curso:nombre, cantidad_alumnos:alumnos}).eq('id', currentCurso.id);
+  if (error) { toast('Error', 'error'); return; }
+  currentCurso = {...currentCurso, nombre_colegio:colegio, curso:nombre, cantidad_alumnos:alumnos};
+  toast('¡Curso actualizado! ✅', 'success');
+  closeModal('modal-editar-curso');
+  await abrirCurso(currentCurso.id);
+}
+
+async function confirmarEliminarCurso() {
+  if (!confirm('¿Eliminar este curso? No se puede deshacer.')) return;
+  await sb.from('cursos').delete().eq('id', currentCurso.id);
+  closeModal('modal-editar-curso');
+  currentCurso = null;
+  toast('Curso eliminado', '');
+  await renderDashboard();
+}
+
+async function confirmarEliminarEvento() {
+  if (!currentEvento) return;
+  if (!confirm('¿Eliminar este cumpleaños? Se borrarán todos los pagos y asistencias. No se puede deshacer.')) return;
+  await sb.from('pagos').delete().eq('evento_id', currentEvento.id);
+  await sb.from('eventos').delete().eq('id', currentEvento.id);
+  closeModal('modal-editar-evento');
+  toast('Cumpleaños eliminado', '');
+  currentEvento = null;
+  await abrirCurso(currentCurso.id);
+}
+
+// ══════════════════════════════════════
+// PROCESAR LINK
+// ══════════════════════════════════════
+async function procesarLink(linkCode) {
+  const { data: curso } = await sb.from('cursos').select('*').eq('link_code', linkCode.toUpperCase()).single();
+  if (!curso) { toast('Link inválido', 'error'); renderWelcome(); return; }
+  joinCursoData = curso;
+  if (currentUser) {
+    const { data: existe } = await sb.from('miembros').select('id').eq('curso_id', curso.id).eq('email', currentUser.email).single();
+    if (existe) { toast('Ya sos miembro de ' + curso.curso, 'success'); await renderDashboard(); return; }
+    await unirseAlCurso();
+    return;
+  }
+  renderJoin(curso);
+}
+
+// ══════════════════════════════════════
+// SALON NOMBRE + GOOGLE MAPS
+// ══════════════════════════════════════
+function toggleSalonNombre(prefix) {
+  const tipo = document.getElementById(prefix + '-tipo-lugar')?.value;
+  const group = document.getElementById(prefix + '-salon-nombre-group');
+  if (group) group.style.display = tipo === 'Salón de fiestas' ? 'block' : 'none';
+  actualizarMapsLink(prefix);
+}
+
+function actualizarMapsLink(prefix) {
+  const domicilio = document.getElementById(prefix + '-domicilio')?.value.trim();
+  const ciudad = document.getElementById(prefix + '-ciudad')?.value.trim();
+  const salon = document.getElementById(prefix + '-salon-nombre')?.value.trim();
+  const linkEl = document.getElementById(prefix + '-maps-link');
+  if (!linkEl) return;
+  if (domicilio || ciudad) {
+    const query = encodeURIComponent((salon ? salon + ' ' : '') + (domicilio || '') + ' ' + (ciudad || ''));
+    linkEl.href = 'https://www.google.com/maps/search/?api=1&query=' + query;
+    linkEl.style.display = 'inline-block';
+  } else {
+    linkEl.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════
+function getTutores(cls) {
+  return Array.from(document.querySelectorAll('.' + cls)).map(i => i.value.trim()).filter(v => v);
+}
+function addTutor() {
+  if (tutorCount >= 2) { toast('Máximo 2 tutores', 'error'); return; }
+  tutorCount++;
+  const c = document.getElementById('tutores-container');
+  if (!c) return;
+  const row = document.createElement('div');
+  row.className = 'tutor-row';
+  row.innerHTML = '<input type="text" placeholder="Nombre y apellido" class="tutor-input"><button class="btn-remove" onclick="this.parentElement.remove();tutorCount--;">✕</button>';
+  c.appendChild(row);
+}
+function addJoinTutor() {
+  if (joinTutorCount >= 2) { toast('Máximo 2 tutores', 'error'); return; }
+  joinTutorCount++;
+  const c = document.getElementById('jm-tutores');
+  if (!c) return;
+  const row = document.createElement('div');
+  row.className = 'tutor-row';
+  row.innerHTML = '<input type="text" placeholder="Nombre y apellido" class="jm-tutor-input"><button class="btn-remove" onclick="this.parentElement.remove();joinTutorCount--;">✕</button>';
+  c.appendChild(row);
+}
+
+// ══════════════════════════════════════
+// RETIROS
+// ══════════════════════════════════════
+async function abrirNuevoRetiro() {
+  // Cargar niños del curso como checkboxes
+  const { data: miembros } = await sb.from('miembros').select('id,nombre_hijo').eq('curso_id', currentCurso.id).order('nombre_hijo');
+  const container = document.getElementById('ret-ninos-check');
+  if (container) {
+    container.innerHTML = (miembros || []).map(m => `
+      <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--cream);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">
+        <input type="checkbox" value="${m.id}" data-nombre="${m.nombre_hijo}" style="width:18px;height:18px;accent-color:var(--pink);">
+        ${m.nombre_hijo}
+      </label>`).join('');
+  }
+  // Reset campos
+  const fechaInput = document.getElementById('ret-fecha');
+  if (fechaInput) fechaInput.value = '';
+  const adultoInput = document.getElementById('ret-adulto');
+  if (adultoInput) adultoInput.value = '';
+
+  // Verificar si ya tiene foto guardada en su perfil de miembro
+  const fotoGuardada = currentUser?.foto_retiro || null;
+  retiroFotoBase64 = fotoGuardada || null;
+
+  const fotoSection = document.getElementById('ret-foto-section');
+  if (fotoSection) {
+    if (fotoGuardada) {
+      // Ya tiene foto → mostrarla con opción de cambiar
+      fotoSection.innerHTML = `
+        <label style="font-family:Nunito;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);display:block;margin-bottom:6px;">Foto del adulto</label>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="${fotoGuardada}" style="width:72px;height:72px;border-radius:12px;object-fit:cover;border:2px solid var(--pink-light);">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#065F46;margin-bottom:4px;">✅ Foto guardada</div>
+            <button onclick="cambiarFotoRetiro()" style="background:none;border:none;font-family:Nunito;font-size:12px;color:var(--pink);font-weight:700;cursor:pointer;text-decoration:underline;">Cambiar foto</button>
+          </div>
+        </div>`;
+    } else {
+      // No tiene foto → opciones de selfie o galería
+      fotoSection.innerHTML = `
+        <label style="font-family:Nunito;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);display:block;margin-bottom:6px;">Foto del adulto que retira <span style="font-weight:400;opacity:.7;">(se guarda para futuros retiros)</span></label>
+        <div id="ret-foto-preview" style="display:none;margin-bottom:10px;text-align:center;">
+          <img id="ret-foto-img" style="width:80px;height:80px;border-radius:12px;object-fit:cover;border:2px solid var(--pink-light);">
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="tomarSelfie()" style="flex:1;padding:12px;background:var(--pink);color:white;border:none;border-radius:var(--radius-sm);font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">🤳 Selfie</button>
+          <label style="flex:1;padding:12px;background:var(--cream);border:2px solid var(--pink-light);border-radius:var(--radius-sm);font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;">
+            🖼️ Galería
+            <input type="file" accept="image/*" onchange="previsualizarFotoRetiro(event)" style="display:none;">
+          </label>
+        </div>
+        <!-- cámara selfie oculta -->
+        <div id="selfie-container" style="display:none;margin-top:12px;text-align:center;">
+          <video id="selfie-video" style="width:100%;border-radius:12px;max-height:260px;background:#000;" autoplay playsinline></video>
+          <button onclick="capturarSelfie()" style="margin-top:8px;background:var(--pink);color:white;border:none;border-radius:999px;padding:10px 24px;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;width:100%;">📸 Capturar</button>
+          <canvas id="selfie-canvas" style="display:none;"></canvas>
+        </div>`;
+    }
+  }
+  showModal('modal-nuevo-retiro');
+}
+
+function previsualizarFotoRetiro(event) {
+  const file = event?.target?.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    retiroFotoBase64 = e.target.result;
+    const preview = document.getElementById('ret-foto-preview');
+    const img = document.getElementById('ret-foto-img');
+    if (img) img.src = retiroFotoBase64;
+    if (preview) preview.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function cambiarFotoRetiro() {
+  // Resetear a la pantalla de carga
+  retiroFotoBase64 = null;
+  // Simular que no tiene foto guardada temporalmente
+  const fotoSection = document.getElementById('ret-foto-section');
+  if (fotoSection) {
+    fotoSection.innerHTML = `
+      <label style="font-family:Nunito;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);display:block;margin-bottom:6px;">Nueva foto del adulto</label>
+      <div id="ret-foto-preview" style="display:none;margin-bottom:10px;text-align:center;">
+        <img id="ret-foto-img" style="width:80px;height:80px;border-radius:12px;object-fit:cover;border:2px solid var(--pink-light);">
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="tomarSelfie()" style="flex:1;padding:12px;background:var(--pink);color:white;border:none;border-radius:var(--radius-sm);font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">🤳 Selfie</button>
+        <label style="flex:1;padding:12px;background:var(--cream);border:2px solid var(--pink-light);border-radius:var(--radius-sm);font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;text-align:center;display:flex;align-items:center;justify-content:center;">
+          🖼️ Galería
+          <input type="file" accept="image/*" onchange="previsualizarFotoRetiro(event)" style="display:none;">
+        </label>
+      </div>
+      <div id="selfie-container" style="display:none;margin-top:12px;text-align:center;">
+        <video id="selfie-video" style="width:100%;border-radius:12px;max-height:260px;background:#000;" autoplay playsinline></video>
+        <button onclick="capturarSelfie()" style="margin-top:8px;background:var(--pink);color:white;border:none;border-radius:999px;padding:10px 24px;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;width:100%;">📸 Capturar</button>
+        <canvas id="selfie-canvas" style="display:none;"></canvas>
+      </div>`;
+  }
+}
+
+let selfieStream = null;
+
+async function tomarSelfie() {
+  const container = document.getElementById('selfie-container');
+  const video = document.getElementById('selfie-video');
+  if (!container || !video) return;
+  try {
+    selfieStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    video.srcObject = selfieStream;
+    container.style.display = 'block';
+  } catch(e) {
+    toast('No se pudo acceder a la cámara', 'error');
+  }
+}
+
+function capturarSelfie() {
+  const video = document.getElementById('selfie-video');
+  const canvas = document.getElementById('selfie-canvas');
+  if (!video || !canvas) return;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  retiroFotoBase64 = canvas.toDataURL('image/jpeg', 0.8);
+  // Detener cámara
+  if (selfieStream) { selfieStream.getTracks().forEach(t => t.stop()); selfieStream = null; }
+  // Mostrar preview
+  const container = document.getElementById('selfie-container');
+  if (container) container.style.display = 'none';
+  const fotoSection = document.getElementById('ret-foto-section');
+  if (fotoSection) {
+    fotoSection.innerHTML = `
+      <label style="font-family:Nunito;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-light);display:block;margin-bottom:6px;">Foto del adulto</label>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <img src="${retiroFotoBase64}" style="width:72px;height:72px;border-radius:12px;object-fit:cover;border:2px solid var(--pink);">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--pink);margin-bottom:4px;">📸 Selfie capturada</div>
+          <button onclick="cambiarFotoRetiro()" style="background:none;border:none;font-family:Nunito;font-size:12px;color:var(--text-light);cursor:pointer;text-decoration:underline;">Cambiar</button>
+        </div>
+      </div>`;
+  }
+  toast('¡Selfie capturada! ✅', 'success');
+}
+
+async function crearRetiro() {
+  const fecha = document.getElementById('ret-fecha')?.value;
+  const adulto = document.getElementById('ret-adulto')?.value.trim();
+  const checks = document.querySelectorAll('#ret-ninos-check input[type=checkbox]:checked');
+  const ninos = Array.from(checks).map(c => c.dataset.nombre);
+  const ninoIds = Array.from(checks).map(c => c.value);
+
+  if (!fecha || !adulto) { toast('Completá fecha y nombre del adulto', 'error'); return; }
+  if (ninos.length === 0) { toast('Seleccioná al menos un niño/a', 'error'); return; }
+  if (!retiroFotoBase64) { toast('Adjuntá una foto del adulto', 'error'); return; }
+
+  const { data: retiro, error } = await sb.from('retiros').insert({
+    curso_id: currentCurso.id,
+    creador_id: currentUser.id,
+    adulto_nombre: adulto,
+    adulto_foto: retiroFotoBase64,
+    fecha: fecha,
+    ninos: ninos,
+    nino_ids: ninoIds,
+    estado: 'pendiente',
+    aprobaciones: {}
+  }).select().single();
+
+  if (error) { toast('Error al crear retiro: ' + error.message, 'error'); console.error(error); return; }
+
+  // Guardar foto en perfil del miembro si es nueva (primera vez)
+  if (!currentUser?.foto_retiro && retiroFotoBase64) {
+    await sb.from('miembros').update({ foto_retiro: retiroFotoBase64 }).eq('id', currentUser.id);
+    currentUser.foto_retiro = retiroFotoBase64;
+    localStorage.setItem('elcole_user', JSON.stringify(currentUser));
+  }
+
+  // Detener cámara si quedó abierta
+  if (selfieStream) { selfieStream.getTracks().forEach(t => t.stop()); selfieStream = null; }
+
+  // Notificar a los padres de los niños seleccionados (crear registros de aprobación pendiente)
+  for (const ninoId of ninoIds) {
+    const { data: miembro } = await sb.from('miembros').select('id,email,nombre_hijo').eq('id', ninoId).single();
+    if (miembro && miembro.email !== currentUser.email) {
+      await sb.from('retiro_aprobaciones').insert({
+        retiro_id: retiro.id,
+        miembro_id: miembro.id,
+        email: miembro.email,
+        nombre_hijo: miembro.nombre_hijo,
+        aprobado: null
+      });
+    }
+  }
+
+  closeModal('modal-nuevo-retiro');
+  toast('¡Retiro creado! Los padres recibirán la solicitud de aprobación 🚗', 'success');
+
+  // Notificar a los padres de los niños seleccionados
+  await crearNotificaciones({
+    cursoId: currentCurso.id,
+    soloEmails: ninoIds,
+    usarMiembroIds: true,
+    excluirEmail: currentUser.email,
+    tipo: 'retiro',
+    titulo: '🚗 Solicitud de retiro',
+    cuerpo: `${adulto} solicita retirar a ${ninos.join(', ')} el ${new Date(fecha + 'T00:00:00').toLocaleDateString('es-AR', {day:'numeric', month:'long'})}. Tu aprobación es requerida.`
+  });
+
+  await cargarRetiros();
+}
+
+async function abrirRetiro(retiroId) {
+  const { data: retiro } = await sb.from('retiros').select('*').eq('id', retiroId).single();
+  if (!retiro) return;
+  const { data: aprobaciones } = await sb.from('retiro_aprobaciones').select('*').eq('retiro_id', retiroId);
+  // Buscar todos los IDs de miembro del usuario actual en este curso
+  const { data: misPerfil } = await sb.from('miembros')
+    .select('id').eq('curso_id', currentCurso?.id).eq('email', currentUser.email);
+  const misMiembroIds = (misPerfil || []).map(m => m.id);
+  if (currentUser.id && !misMiembroIds.includes(currentUser.id)) misMiembroIds.push(currentUser.id);
+  const soyCreador = misMiembroIds.includes(retiro.creador_id);
+  const f = new Date(retiro.fecha + 'T00:00:00');
+  const fechaStr = f.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
+  const mismoNino = (aprobaciones || []).find(a => a.email === currentUser?.email);
+
+  const aprobHtml = (aprobaciones || []).map(a => {
+    const badge = a.aprobado === true
+      ? `<span style="background:#D1FAE5;color:#065F46;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;">✅ Aprobó</span>`
+      : a.aprobado === false
+      ? `<span style="background:#FEE2E2;color:#991B1B;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;">❌ Rechazó</span>`
+      : `<span style="background:#FEF3C7;color:#92400E;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:700;">⏳ Pendiente</span>`;
+    // Botón cancelar aprobación — disponible si ya respondió (para cualquier padre)
+    const esMiAprobacion = a.email === currentUser?.email;
+    const btnCancelar = (esMiAprobacion && a.aprobado !== null)
+      ? `<button onclick="responderRetiro('${a.id}',null,'${retiroId}')" style="background:none;border:none;font-family:Nunito;font-size:11px;color:#999;cursor:pointer;text-decoration:underline;margin-left:6px;">Cancelar</button>`
+      : '';
+    return `<div class="pago-row">
+      <div><div style="font-weight:700;font-size:14px;">👤 ${a.nombre_hijo}</div></div>
+      <div style="display:flex;align-items:center;">${badge}${btnCancelar}</div>
+    </div>`;
+  }).join('');
+
+  render(`
+    <div>
+      <div style="background:linear-gradient(135deg,#7C3AED,#A78BFA);padding:24px 20px 44px;text-align:center;color:white;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <button onclick="abrirCurso('${currentCurso?.id}')" style="background:rgba(255,255,255,.25);border:none;border-radius:999px;padding:7px 14px;color:white;font-family:'Nunito';font-size:13px;font-weight:700;cursor:pointer;">← Volver</button>
+          ${soyCreador ? `<button onclick="eliminarRetiro('${retiroId}')" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:7px 14px;color:white;font-family:Nunito;font-size:13px;font-weight:700;cursor:pointer;">🗑️ Eliminar</button>` : '<div></div>'}
+        </div>
+        <div style="font-size:48px;margin-bottom:8px;">🚗</div>
+        <h2 style="font-family:'Fredoka One';font-size:26px;margin-bottom:4px;">${retiro.adulto_nombre}</h2>
+        <div style="font-size:14px;opacity:.9;">${fechaStr}</div>
+        <div style="margin-top:8px;font-size:13px;opacity:.8;">Retira a: ${retiro.ninos?.join(', ')}</div>
+      </div>
+      <div style="padding:16px 20px 100px;margin-top:-20px;">
+
+        ${retiro.adulto_foto ? `<div class="card" style="text-align:center;">
+          <div class="card-title">📸 Foto del adulto</div>
+          <img src="${retiro.adulto_foto}" style="width:120px;height:120px;border-radius:16px;object-fit:cover;border:3px solid #A78BFA;">
+        </div>` : ''}
+
+        ${mismoNino && mismoNino.aprobado === null ? `
+        <div class="card" style="border:2px solid #FCD34D;background:#FFFBEB;">
+          <div class="card-title" style="color:#92400E;">⚠️ Tu aprobación es requerida</div>
+          <p style="font-size:13px;color:#78350F;line-height:1.6;margin-bottom:16px;">
+            <b>${retiro.adulto_nombre}</b> solicita retirar a <b>${mismoNino.nombre_hijo}</b> el ${fechaStr}. Al aprobar, confirmás que autorizás este retiro y que el adulto es de tu confianza.
+          </p>
+          <div style="display:flex;gap:10px;">
+            <button onclick="responderRetiro('${mismoNino.id}',true,'${retiroId}')" style="flex:1;padding:12px;background:#10B981;color:white;border:none;border-radius:999px;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;">✅ Apruebo</button>
+            <button onclick="responderRetiro('${mismoNino.id}',false,'${retiroId}')" style="flex:1;padding:12px;background:#EF4444;color:white;border:none;border-radius:999px;font-family:Nunito;font-size:14px;font-weight:700;cursor:pointer;">❌ No autorizo</button>
+          </div>
+        </div>` : ''}
+
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <div class="card-title" style="margin-bottom:0;">✅ Aprobaciones</div>
+            ${soyCreador ? `<button onclick="editarNinosRetiro('${retiroId}')" style="background:var(--pink);color:white;border:none;border-radius:999px;padding:5px 12px;font-family:Nunito;font-size:12px;font-weight:700;cursor:pointer;">✏️ Editar niños</button>` : ''}
+          </div>
+          ${aprobHtml || '<p style="font-size:13px;color:var(--text-light);">Sin aprobaciones requeridas.</p>'}
+        </div>
+
+      </div>
+    </div>
+  `);
+}
+
+async function eliminarRetiro(retiroId) {
+  if (!confirm('¿Eliminar este retiro? No se puede deshacer.')) return;
+  await sb.from('retiro_aprobaciones').delete().eq('retiro_id', retiroId);
+  await sb.from('retiros').delete().eq('id', retiroId);
+  toast('Retiro eliminado', '');
+  await abrirCurso(currentCurso.id);
+}
+
+async function editarNinosRetiro(retiroId) {
+  const { data: retiro } = await sb.from('retiros').select('*').eq('id', retiroId).single();
+  const { data: aprobaciones } = await sb.from('retiro_aprobaciones').select('*').eq('retiro_id', retiroId);
+  const { data: miembros } = await sb.from('miembros').select('id,nombre_hijo').eq('curso_id', currentCurso.id).order('nombre_hijo');
+  const ninosActuales = retiro.nino_ids || [];
+
+  const checkHtml = (miembros || []).map(m => {
+    const checked = ninosActuales.includes(m.id) ? 'checked' : '';
+    const aprobacion = aprobaciones?.find(a => a.miembro_id === m.id);
+    const estadoBadge = aprobacion
+      ? (aprobacion.aprobado === true ? ' ✅' : aprobacion.aprobado === false ? ' ❌' : ' ⏳')
+      : '';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--cream);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">
+      <input type="checkbox" value="${m.id}" data-nombre="${m.nombre_hijo}" ${checked} style="width:18px;height:18px;accent-color:var(--pink);">
+      ${m.nombre_hijo}${estadoBadge}
+    </label>`;
+  }).join('');
+
+  // Mostrar modal de edición
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay open';
+  modal.id = 'modal-editar-ninos-retiro';
+  modal.innerHTML = `
+    <div class="modal">
+      <div class="modal-handle" onclick="document.getElementById('modal-editar-ninos-retiro').remove()"></div>
+      <div class="modal-title">✏️ Editar niños del retiro</div>
+      <p style="font-size:13px;color:var(--text-light);margin-bottom:16px;line-height:1.5;">Podés agregar o quitar niños. Los nuevos requerirán aprobación de sus padres. Los que quites perderán su aprobación.</p>
+      <div style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;margin-bottom:16px;" id="edit-ret-ninos">${checkHtml}</div>
+      <button class="btn btn-primary" onclick="guardarNinosRetiro('${retiroId}')">💾 Guardar cambios</button>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+async function guardarNinosRetiro(retiroId) {
+  const { data: retiro } = await sb.from('retiros').select('*').eq('id', retiroId).single();
+  const { data: aprobaciones } = await sb.from('retiro_aprobaciones').select('*').eq('retiro_id', retiroId);
+  const checks = document.querySelectorAll('#edit-ret-ninos input[type=checkbox]:checked');
+  const nuevosIds = Array.from(checks).map(c => c.value);
+  const nuevosNombres = Array.from(checks).map(c => c.dataset.nombre);
+  const anterioresIds = retiro.nino_ids || [];
+
+  // Quitar los que se removieron
+  const removidos = anterioresIds.filter(id => !nuevosIds.includes(id));
+  for (const id of removidos) {
+    await sb.from('retiro_aprobaciones').delete().eq('retiro_id', retiroId).eq('miembro_id', id);
+  }
+
+  // Agregar los nuevos
+  const agregados = nuevosIds.filter(id => !anterioresIds.includes(id));
+  for (const id of agregados) {
+    const { data: miembro } = await sb.from('miembros').select('id,email,nombre_hijo').eq('id', id).single();
+    if (miembro && miembro.email !== currentUser.email) {
+      await sb.from('retiro_aprobaciones').insert({
+        retiro_id: retiroId, miembro_id: miembro.id,
+        email: miembro.email, nombre_hijo: miembro.nombre_hijo, aprobado: null
+      });
+    }
+  }
+
+  // Actualizar retiro
+  await sb.from('retiros').update({ ninos: nuevosNombres, nino_ids: nuevosIds, estado: 'pendiente' }).eq('id', retiroId);
+
+  document.getElementById('modal-editar-ninos-retiro')?.remove();
+  toast('Retiro actualizado ✅', 'success');
+  await abrirRetiro(retiroId);
+}
+
+async function responderRetiro(aprobacionId, valor, retiroId) {
+  await sb.from('retiro_aprobaciones').update({ aprobado: valor }).eq('id', aprobacionId);
+  // Recalcular estado general
+  const { data: aprobaciones } = await sb.from('retiro_aprobaciones').select('aprobado').eq('retiro_id', retiroId);
+  let nuevoEstado = 'pendiente';
+  if (aprobaciones?.every(a => a.aprobado === true)) nuevoEstado = 'aprobado';
+  else if (aprobaciones?.some(a => a.aprobado === false)) nuevoEstado = 'rechazado';
+  // Si canceló (null) vuelve a pendiente
+  if (valor === null) nuevoEstado = 'pendiente';
+  await sb.from('retiros').update({ estado: nuevoEstado }).eq('id', retiroId);
+  const msg = valor === null ? 'Aprobación cancelada' : valor ? '¡Retiro aprobado! ✅' : 'Retiro rechazado ❌';
+  toast(msg, valor ? 'success' : 'error');
+  await abrirRetiro(retiroId);
+}
+// ══════════════════════════════════════
+// NOTIFICACIONES
+// ══════════════════════════════════════
+let notifPanelOpen = false;
+
+async function crearNotificaciones({ cursoId, excluirEmail, tipo, titulo, cuerpo, soloEmails, usarMiembroIds }) {
+  let miembros;
+  if (soloEmails && usarMiembroIds) {
+    // soloEmails son en realidad IDs de miembros
+    const { data } = await sb.from('miembros').select('id,email').in('id', soloEmails);
+    miembros = data;
+  } else {
+    const { data } = await sb.from('miembros').select('id,email').eq('curso_id', cursoId);
+    miembros = data;
+  }
+  if (!miembros?.length) return;
+  const notifs = miembros
+    .filter(m => m.email !== excluirEmail)
+    .map(m => ({
+      miembro_id: m.id,
+      email: m.email,
+      tipo,
+      titulo,
+      cuerpo,
+      leida: false,
+      created_at: new Date().toISOString()
+    }));
+  if (notifs.length) await sb.from('notificaciones').insert(notifs);
+}
+
+async function cargarNotificaciones() {
+  if (!currentUser?.email) return;
+  const { data } = await sb.from('notificaciones')
+    .select('*')
+    .eq('email', currentUser.email)
+    .order('created_at', { ascending: false })
+    .limit(30);
+
+  const notifs = data || [];
+  const noLeidas = notifs.filter(n => !n.leida).length;
+
+  // Actualizar badge
+  const badge = document.getElementById('bell-badge');
+  if (badge) {
+    if (noLeidas > 0) {
+      badge.textContent = noLeidas > 9 ? '9+' : noLeidas;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Render lista
+  const list = document.getElementById('notif-list');
+  if (!list) return;
+  if (!notifs.length) {
+    list.innerHTML = '<p style="padding:24px;text-align:center;color:var(--text-light);font-size:13px;">Sin notificaciones 🎉</p>';
+    return;
+  }
+  list.innerHTML = notifs.map(n => {
+    const fecha = new Date(n.created_at);
+    const timeStr = fecha.toLocaleDateString('es-AR', {day:'numeric', month:'short'}) + ' · ' + fecha.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+    return `<div class="notif-item ${n.leida ? '' : 'unread'}" onclick="leerNotif('${n.id}')">
+      <div class="notif-title">${n.titulo}</div>
+      <div class="notif-body">${n.cuerpo}</div>
+      <div class="notif-time">${timeStr}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleNotifPanel() {
+  notifPanelOpen = !notifPanelOpen;
+  const panel = document.getElementById('notif-panel');
+  if (!panel) return;
+  if (notifPanelOpen) {
+    panel.classList.add('open');
+    cargarNotificaciones();
+    // Cerrar al tocar fuera
+    setTimeout(() => {
+      document.addEventListener('click', cerrarNotifPanelFuera, { once: true });
+    }, 50);
+  } else {
+    panel.classList.remove('open');
+  }
+}
+
+function cerrarNotifPanelFuera(e) {
+  const panel = document.getElementById('notif-panel');
+  const bell = document.getElementById('bell-btn');
+  if (panel && !panel.contains(e.target) && bell && !bell.contains(e.target)) {
+    panel.classList.remove('open');
+    notifPanelOpen = false;
+  }
+}
+
+async function leerNotif(notifId) {
+  await sb.from('notificaciones').update({ leida: true }).eq('id', notifId);
+  await cargarNotificaciones();
+}
+
+async function marcarTodasLeidas() {
+  if (!currentUser?.email) return;
+  await sb.from('notificaciones').update({ leida: true }).eq('email', currentUser.email).eq('leida', false);
+  await cargarNotificaciones();
+  toast('Todas leídas ✅', 'success');
+}
+
+// ══════════════════════════════════════
+// INVITACIÓN DIGITAL
+// ══════════════════════════════════════
+function abrirGeneradorInvitacion() {
+  // Pre-cargar el nombre del cumpleañero
+  const input = document.getElementById('inv-nombre-display');
+  if (input && currentEvento?.nombre_cumpleanero) input.value = currentEvento.nombre_cumpleanero;
+  document.getElementById('inv-tematica').value = '';
+  showModal('modal-generar-invitacion');
+}
+
+async function generarInvitacion() {
+  const nombre = document.getElementById('inv-nombre-display')?.value.trim();
+  const tematica = document.getElementById('inv-tematica')?.value.trim();
+  if (!nombre || !tematica) { toast('Completá nombre y temática', 'error'); return; }
+
+  const ev = currentEvento;
+  const btn = document.getElementById('btn-generar-inv');
+  btn.textContent = '⏳ Generando...';
+  btn.disabled = true;
+
+  // Armar datos del evento para el prompt
+  const fEvento = new Date(ev.fecha_cumple + 'T00:00:00');
+  const fechaStr = fEvento.toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long' });
+  const lugar = ev.nombre_salon || ev.tipo_lugar || '';
+  const domicilio = ev.domicilio ? `${ev.domicilio}, ${ev.ciudad}` : '';
+  const horario = ev.horario_desde && ev.horario_hasta ? `${ev.horario_desde} a ${ev.horario_hasta}` : '';
+
+  const prompt = `Creá una tarjeta de invitación de cumpleaños en HTML puro (sin DOCTYPE, sin html/head/body tags, solo el contenido).
+
+Datos del cumpleaños:
+- Nombre: ${nombre}
+- Temática: ${tematica}
+- Fecha de la fiesta: ${fechaStr}
+${lugar ? `- Lugar: ${lugar}` : ''}
+${domicilio ? `- Dirección: ${domicilio}` : ''}
+${horario ? `- Horario: ${horario}` : ''}
+
+Requisitos de diseño:
+- Tarjeta vertical, ancho máximo 400px, centrada
+- Temática visual fuerte acorde a "${tematica}": colores, emojis, estilos tipográficos que representen el tema
+- Nombre del cumpleañero muy grande y destacado
+- Fecha, lugar y horario claramente visibles
+- Usar Google Fonts si conviene para la temática
+- Fondo con gradiente o patrón relacionado al tema
+- Sin imágenes externas, todo con CSS, emojis y SVG inline si necesario
+- Que sea hermosa, festiva y compartible por WhatsApp como screenshot
+- Incluir al pie: "¡Te esperamos!" o frase temática acorde
+- Solo devolver el HTML, sin explicaciones ni markdown`;
+
+  try {
+    const response = await fetch('/.netlify/functions/generar-invitacion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Error del servidor');
+    const html = data.html || '';
+    const clean = html.replace(/```html/g, '').replace(/```/g, '').trim();
+
+    closeModal('modal-generar-invitacion');
+    document.getElementById('inv-contenido').innerHTML = clean;
+    document.getElementById('pantalla-invitacion').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+
+  } catch(e) {
+    toast('Error al generar la tarjeta', 'error');
+    console.error(e);
+  } finally {
+    btn.textContent = '✨ Generar tarjeta';
+    btn.disabled = false;
+  }
+}
+
+function cerrarInvitacion() {
+  document.getElementById('pantalla-invitacion').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+async function compartirInvitacion() {
+  const contenido = document.getElementById('inv-contenido');
+  if (!contenido) return;
+  // Intentar Web Share API para WhatsApp
+  const texto = `🎉 ¡Estás invitado al cumple de ${currentEvento?.nombre_cumpleanero}!\n\n` +
+    (currentEvento?.fecha_cumple ? `📅 ${new Date(currentEvento.fecha_cumple + 'T00:00:00').toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'})}\n` : '') +
+    (currentEvento?.domicilio ? `📍 ${currentEvento.domicilio}, ${currentEvento.ciudad}\n` : '') +
+    (currentEvento?.horario_desde ? `🕐 ${currentEvento.horario_desde} a ${currentEvento.horario_hasta}\n` : '') +
+    '\n¡Los esperamos!';
+  if (navigator.share) {
+    navigator.share({ text: texto }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(texto).then(() => toast('¡Datos copiados para compartir! 📋', 'success'));
+  }
+}
+
+</script>
+</body>
+</html>
