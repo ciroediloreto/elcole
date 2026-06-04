@@ -804,6 +804,7 @@ async function renderDashboard() {
   `);
   setGlobalHeader(true, nombre);
   cargarNotificaciones();
+  checkRecordatorios();
 }
 
 function setGlobalHeader(visible, nombre) {
@@ -1358,9 +1359,11 @@ async function abrirCurso(cursoId) {
         <div class="tabs" style="margin-top:0;">
           <button class="tab active" id="tab-ev" onclick="switchCursoTab('ev')">🎂 Cumpleaños</button>
           <button class="tab" id="tab-ret" onclick="switchCursoTab('ret')">🚗 Retiros</button>
+          <button class="tab" id="tab-hist" onclick="switchCursoTab('hist')">📋 Historial</button>
         </div>
         <div id="panel-ev"></div>
         <div id="panel-ret" style="display:none;"></div>
+        <div id="panel-hist" style="display:none;"></div>
       </div>
       <button class="fab" id="fab-curso" onclick="onFabCurso()">🎂</button>
     </div>
@@ -1372,14 +1375,16 @@ async function abrirCurso(cursoId) {
 function switchCursoTab(tab) {
   document.getElementById('panel-ev').style.display = tab === 'ev' ? 'block' : 'none';
   document.getElementById('panel-ret').style.display = tab === 'ret' ? 'block' : 'none';
+  document.getElementById('panel-hist').style.display = tab === 'hist' ? 'block' : 'none';
   document.getElementById('tab-ev').className = 'tab' + (tab==='ev'?' active':'');
   document.getElementById('tab-ret').className = 'tab' + (tab==='ret'?' active':'');
-  // FAB dinámico según pestaña
+  document.getElementById('tab-hist').className = 'tab' + (tab==='hist'?' active':'');
   const fab = document.getElementById('fab-curso');
-  if (fab) { fab.textContent = tab === 'ev' ? '🎂' : '🚗'; }
+  if (fab) { fab.style.display = tab === 'hist' ? 'none' : 'flex'; fab.textContent = tab === 'ret' ? '🚗' : '🎂'; }
   currentTab = tab;
   if (tab === 'ev') cargarEventos();
-  else cargarRetiros();
+  else if (tab === 'ret') cargarRetiros();
+  else cargarHistorial();
 }
 
 function onFabCurso() {
@@ -1476,30 +1481,205 @@ async function cargarRetiros() {
   }).join('');
 }
 
+async function cargarHistorial() {
+  const panel = document.getElementById('panel-hist');
+  if (!panel) return;
+  panel.innerHTML = '<p style="text-align:center;color:var(--text-light);padding:20px;font-size:13px;">Cargando...</p>';
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+  // Traer todos los eventos (pasados y futuros)
+  const { data: eventos } = await sb.from('eventos').select('*').eq('curso_id', currentCurso.id).order('fecha_cumple', { ascending: false });
+  // Traer todos los retiros del curso
+  const { data: retiros } = await sb.from('retiros').select('*').eq('curso_id', currentCurso.id).order('fecha', { ascending: false });
+
+  let html = '';
+
+  // — Sección cumpleaños —
+  html += `<div style="font-family:'Fredoka One';font-size:18px;color:var(--pink);margin:16px 0 10px;">🎂 Cumpleaños</div>`;
+  if (!eventos?.length) {
+    html += '<p style="font-size:13px;color:var(--text-light);">Sin cumpleaños registrados.</p>';
+  } else {
+    for (const ev of eventos) {
+      const f = new Date(ev.fecha_cumple + 'T00:00:00');
+      const isPast = f < hoy;
+      const { data: pagos } = await sb.from('pagos').select('pagado').eq('evento_id', ev.id);
+      const total = pagos?.length || 0;
+      const pagados = pagos?.filter(p => p.pagado).length || 0;
+      const montoRecaudado = pagados * (ev.monto_sugerido || 0);
+      const montoTotal = total * (ev.monto_sugerido || 0);
+      html += `<div class="evento-card" onclick="abrirEvento('${ev.id}')" style="${isPast ? 'opacity:.7;' : ''}">
+        <div class="evento-fecha-badge"><div class="dia">${f.getDate()}</div><div class="mes">${f.toLocaleString('es',{month:'short'}).toUpperCase()}</div></div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:14px;margin-bottom:2px;">🎂 ${ev.nombre_cumpleanero} ${isPast ? '<span style="background:#F3F4F6;color:#6B7280;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">Pasado</span>' : '<span style="background:#D1FAE5;color:#065F46;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">Próximo</span>'}</div>
+          <div style="font-size:12px;color:var(--text-light);">${pagados}/${total} pagaron${ev.monto_sugerido ? ' · $' + montoRecaudado.toLocaleString() + ' de $' + montoTotal.toLocaleString() : ''}</div>
+        </div>
+      </div>`;
+    }
+  }
+
+  // — Sección retiros —
+  html += `<div style="font-family:'Fredoka One';font-size:18px;color:#7C3AED;margin:20px 0 10px;">🚗 Retiros</div>`;
+  if (!retiros?.length) {
+    html += '<p style="font-size:13px;color:var(--text-light);">Sin retiros registrados.</p>';
+  } else {
+    html += retiros.map(r => {
+      const f = new Date(r.fecha + 'T00:00:00');
+      const isPast = f < hoy;
+      const estadoBadge = r.estado === 'aprobado'
+        ? '<span style="background:#D1FAE5;color:#065F46;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">✅ Aprobado</span>'
+        : r.estado === 'rechazado'
+        ? '<span style="background:#FEE2E2;color:#991B1B;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">❌ Rechazado</span>'
+        : '<span style="background:#FEF3C7;color:#92400E;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">⏳ Pendiente</span>';
+      return `<div class="evento-card" onclick="abrirRetiro('${r.id}')" style="${isPast ? 'opacity:.7;' : ''}">
+        <div class="evento-fecha-badge"><div class="dia">${f.getDate()}</div><div class="mes">${f.toLocaleString('es',{month:'short'}).toUpperCase()}</div></div>
+        <div style="flex:1;">
+          <div style="font-weight:800;font-size:14px;margin-bottom:2px;">🚗 ${r.adulto_nombre}</div>
+          <div style="font-size:12px;color:var(--text-light);margin-bottom:4px;">Retira: ${(r.ninos||[]).join(', ')}</div>
+          ${estadoBadge}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  panel.innerHTML = html;
+}
+
+// ══════════════════════════════════════
+// RECORDATORIOS AUTOMÁTICOS
+// ══════════════════════════════════════
+async function checkRecordatorios() {
+  // Corre al entrar al dashboard — revisa cumpleaños en los próximos 30 días
+  // y notifica al papa del cumpleañero ANTERIOR (el que organizó el último cumple)
+  if (!currentUser?.email) return;
+
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const en30 = new Date(hoy); en30.setDate(en30.getDate() + 30);
+
+  // Buscar mis cursos
+  const { data: misMiembros } = await sb.from('miembros').select('curso_id, id').eq('email', currentUser.email);
+  if (!misMiembros?.length) return;
+
+  for (const m of misMiembros) {
+    // Eventos en los próximos 30 días
+    const { data: proximosCumples } = await sb.from('eventos')
+      .select('*')
+      .eq('curso_id', m.curso_id)
+      .gte('fecha_cumple', hoy.toISOString().split('T')[0])
+      .lte('fecha_cumple', en30.toISOString().split('T')[0]);
+
+    for (const ev of (proximosCumples || [])) {
+      // Buscar el organizador del cumple ANTERIOR en el curso (orden por fecha)
+      const { data: eventosAnteriores } = await sb.from('eventos')
+        .select('creador_id, nombre_cumpleanero')
+        .eq('curso_id', m.curso_id)
+        .lt('fecha_cumple', ev.fecha_cumple)
+        .order('fecha_cumple', { ascending: false })
+        .limit(1);
+
+      const organizadorAnteriorId = eventosAnteriores?.[0]?.creador_id;
+      if (!organizadorAnteriorId) continue;
+
+      // Verificar si el organizador anterior soy yo
+      const misIds = misMiembros.map(x => x.id);
+      if (!misIds.includes(organizadorAnteriorId)) continue;
+
+      // Verificar si ya existe una notif de recordatorio para este evento
+      const { data: yaNotif } = await sb.from('notificaciones')
+        .select('id')
+        .eq('email', currentUser.email)
+        .eq('tipo', 'recordatorio_cumple')
+        .like('cuerpo', `%${ev.id}%`)
+        .single();
+
+      if (yaNotif) continue; // Ya fue notificado
+
+      // Verificar que el evento no esté ya creado/organizado
+      if (ev.creador_id) continue; // Ya tiene organizador
+
+      // Crear notificación de recordatorio
+      const f = new Date(ev.fecha_cumple + 'T00:00:00');
+      const fechaStr = f.toLocaleDateString('es-AR', {day:'numeric', month:'long'});
+      const diffDias = Math.ceil((f - hoy) / (1000*60*60*24));
+
+      await sb.from('notificaciones').insert({
+        miembro_id: organizadorAnteriorId,
+        email: currentUser.email,
+        tipo: 'recordatorio_cumple',
+        titulo: '🎂 Próximo organizador de cumple',
+        cuerpo: `Hola! Sabemos que sos el próximo organizador de cumpleaños. En ${diffDias} días es el cumple de ${ev.nombre_cumpleanero} (${fechaStr}). Te sugerimos que vayas armando la colecta. [evento:${ev.id}]`,
+        leida: false
+      });
+    }
+  }
+
+  // Recargar badge si está en dashboard
+  await cargarNotificaciones();
+}
+
 async function cargarEventos() {
   const panel = document.getElementById('panel-ev');
   if (!panel) return;
-  const { data: eventos } = await sb.from('eventos').select('*').eq('curso_id', currentCurso.id).eq('activo', true).order('fecha_cumple');
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+
+  const { data: eventos } = await sb.from('eventos').select('*').eq('curso_id', currentCurso.id).order('fecha_cumple');
   if (!eventos?.length) {
     panel.innerHTML = '<div class="empty-state"><div class="emoji">🎂</div><p>No hay cumpleaños todavía.<br>Tocá el botón 🎂 para agregar.</p></div>';
     return;
   }
-  const html = await Promise.all(eventos.map(async ev => {
+
+  // Separar próximos y pasados
+  const proximos = eventos.filter(ev => new Date(ev.fecha_cumple + 'T00:00:00') >= hoy);
+  const pasados = eventos.filter(ev => new Date(ev.fecha_cumple + 'T00:00:00') < hoy);
+
+  const renderCard = async (ev, isPast) => {
     const { data: pagos } = await sb.from('pagos').select('pagado').eq('evento_id', ev.id);
     const total = pagos?.length || 0;
     const pagados = pagos?.filter(p => p.pagado).length || 0;
     const pct = total > 0 ? Math.round(pagados/total*100) : 0;
+    const montoRecaudado = pagados * (ev.monto_sugerido || 0);
+    const montoTotal = total * (ev.monto_sugerido || 0);
     const f = new Date(ev.fecha_cumple + 'T00:00:00');
-    return `<div class="evento-card" onclick="abrirEvento('${ev.id}')">
+
+    // Días restantes
+    const diffMs = f - hoy;
+    const diffDias = Math.ceil(diffMs / (1000*60*60*24));
+    let diasBadge = '';
+    if (!isPast) {
+      if (diffDias === 0) diasBadge = '<span style="background:#FEE2E2;color:#DC2626;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">¡HOY!</span>';
+      else if (diffDias <= 7) diasBadge = `<span style="background:#FEF3C7;color:#92400E;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">en ${diffDias} días</span>`;
+      else if (diffDias <= 30) diasBadge = `<span style="background:#EDE9FE;color:#5B21B6;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">en ${diffDias} días</span>`;
+    }
+
+    const montoHtml = ev.monto_sugerido ? `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+        <div class="progress-bar" style="flex:1;margin-right:8px;"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <span style="font-size:11px;color:var(--text-light);white-space:nowrap;font-weight:600;">$${montoRecaudado.toLocaleString()} / $${montoTotal.toLocaleString()}</span>
+      </div>` : `
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>`;
+
+    return `<div class="evento-card" onclick="abrirEvento('${ev.id}')" style="${isPast ? 'opacity:.6;' : ''}">
       <div class="evento-fecha-badge"><div class="dia">${f.getDate()}</div><div class="mes">${f.toLocaleString('es',{month:'short'}).toUpperCase()}</div></div>
       <div style="flex:1;">
-        <div style="font-weight:800;font-size:15px;margin-bottom:4px;">🎂 ${ev.nombre_cumpleanero}</div>
-        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+          <span style="font-weight:800;font-size:15px;">🎂 ${ev.nombre_cumpleanero}</span>
+          ${diasBadge}
+        </div>
+        ${montoHtml}
         <div style="font-size:11px;color:var(--text-light);margin-top:3px;">${pagados} de ${total} pagaron · ${pct}%</div>
       </div>
     </div>`;
-  }));
-  panel.innerHTML = html.join('');
+  };
+
+  const htmlProximos = await Promise.all(proximos.map(ev => renderCard(ev, false)));
+  const htmlPasados = await Promise.all(pasados.map(ev => renderCard(ev, true)));
+
+  let html = htmlProximos.join('');
+  if (htmlPasados.length) {
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;">Pasados</div>`;
+    html += htmlPasados.join('');
+  }
+  panel.innerHTML = html;
 }
 
 async function cargarMiembros(panelId = 'panel-mb') {
