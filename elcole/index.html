@@ -1411,18 +1411,13 @@ async function cargarRetiros() {
   const panel = document.getElementById('panel-ret');
   if (!panel) return;
 
-  // Traer el miembro actual del curso
-  const { data: miembroActual } = await sb.from('miembros')
-    .select('id').eq('curso_id', currentCurso.id).eq('email', currentUser.email).single();
-
-  // Todos los IDs de miembro del usuario en este curso (puede tener más de uno)
+  // Todos los IDs de miembro del usuario en este curso
   const { data: misPerfil } = await sb.from('miembros')
     .select('id').eq('curso_id', currentCurso.id).eq('email', currentUser.email);
   const misMiembroIds = (misPerfil || []).map(m => m.id);
-  // Incluir también currentUser.id por si acaso
-  if (currentUser.id && !misMiembroIds.includes(currentUser.id)) misMiembroIds.push(currentUser.id);
+  if (currentUser?.id && !misMiembroIds.includes(currentUser.id)) misMiembroIds.push(currentUser.id);
 
-  // Retiros donde soy creador
+  // Retiros donde soy creador — buscar por CUALQUIER id del usuario
   let retirosCreados = [];
   if (misMiembroIds.length) {
     const { data } = await sb.from('retiros')
@@ -1431,7 +1426,7 @@ async function cargarRetiros() {
     retirosCreados = data || [];
   }
 
-  // Retiros donde soy aprobador (estoy en retiro_aprobaciones)
+  // Retiros donde soy aprobador
   const { data: misAprobaciones } = await sb.from('retiro_aprobaciones')
     .select('retiro_id').eq('email', currentUser.email);
   const idsInvolucrado = (misAprobaciones || []).map(a => a.retiro_id);
@@ -1620,7 +1615,7 @@ async function checkRecordatorios() {
 async function cargarEventos() {
   const panel = document.getElementById('panel-ev');
   if (!panel) return;
-  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const hoyStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD en hora local
 
   const { data: eventos } = await sb.from('eventos').select('*').eq('curso_id', currentCurso.id).order('fecha_cumple');
   if (!eventos?.length) {
@@ -1628,9 +1623,9 @@ async function cargarEventos() {
     return;
   }
 
-  // Separar próximos y pasados
-  const proximos = eventos.filter(ev => new Date(ev.fecha_cumple + 'T00:00:00') >= hoy);
-  const pasados = eventos.filter(ev => new Date(ev.fecha_cumple + 'T00:00:00') < hoy);
+  // Separar próximos y pasados comparando strings YYYY-MM-DD
+  const proximos = eventos.filter(ev => ev.fecha_cumple >= hoyStr);
+  const pasados  = eventos.filter(ev => ev.fecha_cumple < hoyStr);
 
   const renderCard = async (ev, isPast) => {
     const { data: pagos } = await sb.from('pagos').select('pagado').eq('evento_id', ev.id);
@@ -1639,11 +1634,12 @@ async function cargarEventos() {
     const pct = total > 0 ? Math.round(pagados/total*100) : 0;
     const montoRecaudado = pagados * (ev.monto_sugerido || 0);
     const montoTotal = total * (ev.monto_sugerido || 0);
-    const f = new Date(ev.fecha_cumple + 'T00:00:00');
+    const f = new Date(ev.fecha_cumple + 'T12:00:00'); // mediodía evita offset
 
-    // Días restantes
-    const diffMs = f - hoy;
-    const diffDias = Math.ceil(diffMs / (1000*60*60*24));
+    // Días restantes usando string comparison
+    const hoy2 = new Date(); hoy2.setHours(12,0,0,0);
+    const diffMs = new Date(ev.fecha_cumple + 'T12:00:00') - hoy2;
+    const diffDias = Math.round(diffMs / (1000*60*60*24));
     let diasBadge = '';
     if (!isPast) {
       if (diffDias === 0) diasBadge = '<span style="background:#FEE2E2;color:#DC2626;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:700;">¡HOY!</span>';
@@ -1676,7 +1672,7 @@ async function cargarEventos() {
 
   let html = htmlProximos.join('');
   if (htmlPasados.length) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;">Pasados</div>`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;">📁 Cumpleaños anteriores</div>`;
     html += htmlPasados.join('');
   }
   panel.innerHTML = html;
@@ -1846,11 +1842,13 @@ async function abrirEvento(eventoId) {
   const { data: ev } = await sb.from('eventos').select('*').eq('id', eventoId).single();
   if (!ev) return;
   currentEvento = ev;
-  const soyCreador = ev.creador_id === currentUser?.id;
 
-  // Detectar si soy el padre del cumpleañero (mi miembro_id coincide con el del evento)
+  // Detectar todos los IDs de miembro del usuario en cualquier curso
   const { data: misMiembros } = await sb.from('miembros').select('id').eq('email', currentUser.email);
   const misMiembroIds = (misMiembros || []).map(m => m.id);
+  if (currentUser?.id && !misMiembroIds.includes(currentUser.id)) misMiembroIds.push(currentUser.id);
+
+  const soyCreador = misMiembroIds.includes(ev.creador_id);
   const soyPadreCumpleanero = ev.miembro_id && misMiembroIds.includes(ev.miembro_id);
 
   // Fecha del evento (fiesta / colecta)
